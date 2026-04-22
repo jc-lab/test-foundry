@@ -1,0 +1,53 @@
+# Copyright 2026 JC-Lab
+# SPDX-License-Identifier: GPL-2.0-only
+
+# Sample 01: Hello World
+#
+# bat 파일을 Guest에 전송하고 실행한 뒤, stdout을 파일로 저장하고
+# 화면을 캡쳐한 후 종료합니다.
+#
+# 사용법:
+#   test-foundry --vm-name win11 vm-setup --image <image.yaml>
+#   test-foundry --vm-name win11 test --test samples/01-hello-world/test.yaml --output ./output/01
+
+name: "hello-world"
+description: "Upload and run a hello-world bat file, capture stdout and screenshot"
+
+steps:
+  # 1. 부팅 대기
+  - action: wait-boot
+    timeout: 120s
+    params:
+      retry_interval: 5s
+
+  # 2. bat 파일 전송
+  - action: file-upload
+    timeout: 30s
+    params:
+      src: "${{ test.dir }}/hello.bat"
+      dst: "C:\\Temp\\hello.bat"
+
+  # 3. bat 파일 실행 및 stdout을 파일로 리다이렉트
+  - action: exec
+    timeout: 30s
+    params:
+      cmd: "cmd.exe"
+      args: ["/c", "C:\\Temp\\hello.bat > C:\\Temp\\hello-output.txt 2>&1"]
+      expect_exit_code: 0
+
+  # 4. stdout 결과 파일 다운로드
+  - action: file-download
+    timeout: 30s
+    params:
+      src: "C:\\Temp\\hello-output.txt"
+      dst: "./output/01/hello-output.txt"
+
+  # 5. 화면 캡쳐
+  - action: screenshot
+    timeout: 10s
+    params:
+      output: "./output/01/screenshot.png"
+
+  # 6. 종료
+  - action: shutdown
+    timeout: 120s

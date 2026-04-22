@@ -1,0 +1,65 @@
+# Copyright 2026 JC-Lab
+# SPDX-License-Identifier: GPL-2.0-only
+
+# Sample 02: BSOD Test
+#
+# BSOD를 발생시키는 PowerShell 스크립트를 전송하고 실행합니다.
+# pvpanic을 통해 BSOD가 감지되면 메모리 덤프와 화면 캡쳐를 수행한 뒤 종료합니다.
+#
+# 사용법:
+#   test-foundry --vm-name win11 vm-setup --image <image.yaml>
+#   test-foundry --vm-name win11 test --test samples/02-bsod-test/test.yaml --output ./output/02
+
+name: "bsod-test"
+description: "Trigger a BSOD via PowerShell and capture diagnostics on panic"
+
+steps:
+  # 1. 부팅 대기
+  - action: wait-boot
+    timeout: 120s
+    params:
+      retry_interval: 5s
+
+  # 2. BSOD 트리거 스크립트 전송
+  - action: file-upload
+    timeout: 30s
+    params:
+      src: "${{ test.dir }}/trigger-bsod.ps1"
+      dst: "C:\\Temp\\trigger-bsod.ps1"
+
+  # 3. 실행 정책 변경 (스크립트 실행 허용)
+  - action: exec
+    timeout: 30s
+    params:
+      cmd: "powershell"
+      args: ["-Command", "Set-ExecutionPolicy Bypass -Scope Process -Force"]
+      expect_exit_code: 0
+
+  # 4. BSOD 트리거 (이 step은 panic에 의해 중단될 것)
+  - action: exec
+    timeout: 60s
+    params:
+      cmd: "powershell"
+      args: ["-ExecutionPolicy", "Bypass", "-File", "C:\\Temp\\trigger-bsod.ps1"]
+
+  # 5. 이후 step은 panic에 의해 skipped 됨
+  - action: screenshot
+    timeout: 10s
+    params:
+      output: "./output/02/after-exec.png"
+
+# Panic 발생 시 진단 수집
+panic:
+  steps:
+    # BSOD 화면 캡쳐 (VNC를 통해 블루스크린 촬영)
+    - action: screenshot
+      timeout: 10s
+      params:
+        output: "./output/02/bsod-screenshot.png"
+
+    # Guest 메모리 덤프 (크래시 분석용)
+    - action: dump
+      timeout: 300s
+      params:
+        format: "win-dmp"
+        output: "./output/02/memory.dump"

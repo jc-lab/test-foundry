@@ -1,0 +1,17 @@
+# Copyright 2026 JC-Lab
+# SPDX-License-Identifier: GPL-2.0-only
+
+# Common panic handler - include this in test definitions
+# to capture diagnostics when a BSOD/bugcheck occurs.
+
+panic:
+  steps:
+    - action: screenshot
+      timeout: 10s
+      params:
+        output: "./results/panic-screenshot.png"
+
+    - action: dump
+      timeout: 120s
+      params:
+        output: "./results/panic-memory.dump"

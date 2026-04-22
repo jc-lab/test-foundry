@@ -1,0 +1,62 @@
+# Copyright 2026 JC-Lab
+# SPDX-License-Identifier: GPL-2.0-only
+
+# Windows 11 24H2 base image definition
+name: "windows-11-24h2"
+os: "windows"
+description: "Windows 11 24H2 Enterprise evaluation image"
+
+qemu:
+  image: "./images/gusztavvargadr-windows-11-2601.0.0.qcow2"
+  firmware: "/usr/share/OVMF/OVMF_CODE_4M.fd"
+  firmware_vars: "/usr/share/OVMF/OVMF_VARS_4M.fd"
+  memory: "4G"
+  cpus: 2
+  extra_args:
+    - "-device"
+    - "virtio-tablet-pci"
+
+connection:
+  exec_method: "winrm" # "ssh" or "winrm"
+  file_method: "ssh" # "ssh" or "winrm"; defaults to exec_method when omitted
+  username: "vagrant"
+  password: "vagrant"
+  ssh_port: 22
+  winrm_port: 5985
+
+setup:
+  steps:
+    - action: wait-boot
+      timeout: 10m
+      params:
+        retry_interval: 5s
+
+    - action: wait-oobe
+      timeout: 10m
+
+    - action: exec
+      timeout: 60s
+      params:
+        cmd: "powershell"
+        args:
+          - "-Command"
+          - "Set-ExecutionPolicy Bypass -Force"
+
+    - action: exec
+      timeout: 60s
+      params:
+        cmd: "powershell"
+        args:
+          - "-Command"
+          - "Set-Service -Name sshd -StartupType Automatic"
+
+    - action: exec
+      timeout: 60s
+      params:
+        cmd: "powershell"
+        args:
+          - "-Command"
+          - "Start-Service sshd"
+
+    - action: shutdown
+      timeout: 120s

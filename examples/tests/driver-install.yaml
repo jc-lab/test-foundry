@@ -1,0 +1,55 @@
+# Copyright 2026 JC-Lab
+# SPDX-License-Identifier: GPL-2.0-only
+
+# Driver installation test example
+name: "driver-install-test"
+description: "Test driver installation and loading"
+
+include:
+  - "common/panic-handler.yaml"
+
+steps:
+  - action: wait-boot
+    timeout: 120s
+
+  - action: file-upload
+    timeout: 30s
+    params:
+      src: "./build/mydriver.sys"
+      dst: "C:\\Drivers\\mydriver.sys"
+
+  - action: file-upload
+    timeout: 30s
+    params:
+      src: "./build/mydriver.inf"
+      dst: "C:\\Drivers\\mydriver.inf"
+
+  - action: file-upload
+    timeout: 30s
+    params:
+      src: "./build/mydriver.cat"
+      dst: "C:\\Drivers\\mydriver.cat"
+
+  - action: exec
+    timeout: 60s
+    params:
+      cmd: "pnputil"
+      args:
+        - "/add-driver"
+        - "C:\\Drivers\\mydriver.inf"
+        - "/install"
+
+  - action: screenshot
+    timeout: 10s
+    params:
+      output: "./results/after-install.png"
+
+  - action: exec
+    timeout: 30s
+    params:
+      cmd: "sc"
+      args: ["query", "mydriver"]
+      expect_exit_code: 0
+
+  - action: shutdown
+    timeout: 120s
