@@ -166,6 +166,10 @@ output/01/hello-output.txt
 output/01/screenshot.png
 ```
 
+### Video
+
+https://github.com/user-attachments/assets/df809996-ffa4-41ff-853d-884219c2b46c
+
 ## 테스트 정의 예시
 
 예제 [examples/tests/01-hello-world/test.yaml](examples/tests/01-hello-world/test.yaml) 은 다음 흐름으로 동작합니다.
