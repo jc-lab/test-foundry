@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/jc-lab/test-foundry/internal/logging"
+	"github.com/jc-lab/test-foundry/internal/qemu"
 )
 
 // VMConfig is the metadata stored in config.json within a VM context.
@@ -38,9 +39,9 @@ type VMConfig struct {
 	TPM bool `json:"tpm"`
 
 	// Allocated ports/display
-	SSHPort    int `json:"ssh_port"`
-	WinRMPort  int `json:"winrm_port,omitempty"`
-	VNCDisplay int `json:"vnc_display"`
+	SSHPort    int `json:"-"`
+	WinRMPort  int `json:"-"`
+	VNCDisplay int `json:"-"`
 
 	// Connection settings (copied from image config)
 	ExecMethod     string `json:"exec_method"`
@@ -54,7 +55,10 @@ type VMConfig struct {
 }
 
 // CreateContext creates a new VM context directory and initializes it.
-func CreateContext(layout *Layout, qemuPath string, cfg *VMConfig, baseImage string, firmwareVars string) error {
+func CreateContext(layout *Layout, tools *qemu.Tools, cfg *VMConfig, baseImage string, firmwareVars string) error {
+	if tools == nil {
+		tools = qemu.ResolveTools("qemu-system-x86_64")
+	}
 	// Check if already exists
 	if _, err := os.Stat(layout.Root); err == nil {
 		return fmt.Errorf("VM context already exists: %s", layout.Root)
@@ -71,13 +75,7 @@ func CreateContext(layout *Layout, qemuPath string, cfg *VMConfig, baseImage str
 		return fmt.Errorf("failed to resolve base image path: %w", err)
 	}
 
-	qemuImg := filepath.Join(filepath.Dir(qemuPath), "qemu-img")
-	if _, err := exec.LookPath(qemuImg); err != nil {
-		// Fallback: try "qemu-img" directly from PATH
-		qemuImg = "qemu-img"
-	}
-
-	cmd := exec.Command(qemuImg, "create", "-f", "qcow2",
+	cmd := exec.Command(tools.QemuImgPath, "create", "-f", "qcow2",
 		"-b", absBase, "-F", "qcow2",
 		layout.OverlayImage())
 	if output, err := cmd.CombinedOutput(); err != nil {
@@ -97,28 +95,6 @@ func CreateContext(layout *Layout, qemuPath string, cfg *VMConfig, baseImage str
 			return fmt.Errorf("failed to create TPM directory: %w", err)
 		}
 	}
-
-	if cfg.usesSSH() {
-		sshPort, err := findFreePort()
-		if err != nil {
-			return fmt.Errorf("failed to allocate SSH port: %w", err)
-		}
-		cfg.SSHPort = sshPort
-	}
-
-	if cfg.usesWinRM() {
-		winrmPort, err := findFreePort()
-		if err != nil {
-			return fmt.Errorf("failed to allocate WinRM port: %w", err)
-		}
-		cfg.WinRMPort = winrmPort
-	}
-
-	vncDisplay, err := findFreeVNCDisplay()
-	if err != nil {
-		return fmt.Errorf("failed to allocate VNC display: %w", err)
-	}
-	cfg.VNCDisplay = vncDisplay
 
 	cfg.CreatedAt = time.Now()
 
@@ -188,21 +164,6 @@ func findFreePort() (int, error) {
 	return addr.Port, nil
 }
 
-// findFreeVNCDisplay finds an available VNC display number (port 5900+N).
-func findFreeVNCDisplay() (int, error) {
-	for display := 0; display < 100; display++ {
-		port := 5900 + display
-		addr := fmt.Sprintf("127.0.0.1:%d", port)
-		listener, err := net.Listen("tcp", addr)
-		if err != nil {
-			continue
-		}
-		listener.Close()
-		return display, nil
-	}
-	return 0, fmt.Errorf("no free VNC display available (tried ports 5900-5999)")
-}
-
 // copyFile copies a file from src to dst.
 func copyFile(src, dst string) error {
 	in, err := os.Open(src)
@@ -222,6 +183,110 @@ func copyFile(src, dst string) error {
 	}
 
 	return out.Close()
+}
+
+func copyDir(src, dst string) error {
+	srcInfo, err := os.Stat(src)
+	if err != nil {
+		return err
+	}
+
+	if err := os.MkdirAll(dst, srcInfo.Mode()); err != nil {
+		return err
+	}
+
+	entries, err := os.ReadDir(src)
+	if err != nil {
+		return err
+	}
+
+	for _, entry := range entries {
+		srcPath := filepath.Join(src, entry.Name())
+		dstPath := filepath.Join(dst, entry.Name())
+
+		if entry.IsDir() {
+			if err := copyDir(srcPath, dstPath); err != nil {
+				return err
+			}
+			continue
+		}
+
+		if err := copyFile(srcPath, dstPath); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// AllocateRuntimeResources assigns ephemeral ports/display values for a single VM run.
+func AllocateRuntimeResources(cfg *VMConfig) error {
+	if cfg.usesSSH() {
+		sshPort, err := findFreePort()
+		if err != nil {
+			return fmt.Errorf("failed to allocate SSH port: %w", err)
+		}
+		cfg.SSHPort = sshPort
+	} else {
+		cfg.SSHPort = 0
+	}
+
+	if cfg.usesWinRM() {
+		winrmPort, err := findFreePort()
+		if err != nil {
+			return fmt.Errorf("failed to allocate WinRM port: %w", err)
+		}
+		cfg.WinRMPort = winrmPort
+	} else {
+		cfg.WinRMPort = 0
+	}
+
+	vncDisplay, err := qemu.FindFreeVNCDisplay()
+	if err != nil {
+		return fmt.Errorf("failed to allocate VNC display: %w", err)
+	}
+	cfg.VNCDisplay = vncDisplay
+	return nil
+}
+
+// CreateTestContext creates an isolated runtime context for a single test execution.
+func CreateTestContext(baseLayout *Layout, testContext string, tools *qemu.Tools, cfg *VMConfig) (*Layout, error) {
+	if tools == nil {
+		tools = qemu.ResolveTools("qemu-system-x86_64")
+	}
+	layout := baseLayout.TestContext(testContext)
+	if _, err := os.Stat(layout.Root); err == nil {
+		return nil, fmt.Errorf("test context already exists: %s", layout.Root)
+	}
+	if err := os.MkdirAll(layout.Root, 0755); err != nil {
+		return nil, fmt.Errorf("failed to create test context directory: %w", err)
+	}
+
+	backingImage, err := filepath.Abs(baseLayout.OverlayImage())
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve backing image path: %w", err)
+	}
+
+	cmd := exec.Command(tools.QemuImgPath, "create", "-f", "qcow2", "-b", backingImage, "-F", "qcow2", layout.OverlayImage())
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return nil, fmt.Errorf("failed to create external snapshot: %w\n%s", err, string(output))
+	}
+
+	if _, err := os.Stat(baseLayout.EFIVars()); err == nil {
+		if err := copyFile(baseLayout.EFIVars(), layout.EFIVars()); err != nil {
+			return nil, fmt.Errorf("failed to copy EFI vars into test context: %w", err)
+		}
+	}
+
+	if cfg.TPM {
+		if info, err := os.Stat(baseLayout.TPMDir()); err == nil && info.IsDir() {
+			if err := copyDir(baseLayout.TPMDir(), layout.TPMDir()); err != nil {
+				return nil, fmt.Errorf("failed to copy TPM state into test context: %w", err)
+			}
+		}
+	}
+
+	return layout, nil
 }
 
 func (cfg *VMConfig) usesSSH() bool {

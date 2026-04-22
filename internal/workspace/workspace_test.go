@@ -5,11 +5,16 @@ package workspace
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
+	"syscall"
 	"testing"
 	"time"
+
+	"github.com/jc-lab/test-foundry/internal/qemu"
 )
 
 // --- TestNewLayout ---
@@ -38,8 +43,6 @@ func TestNewLayout(t *testing.T) {
 		{"TPMDir", layout.TPMDir(), "tpm"},
 		{"TPMSocket", layout.TPMSocket(), filepath.Join("tpm", "swtpm.sock")},
 		{"TPMLog", layout.TPMLog(), filepath.Join("tpm", "swtpm.log")},
-		{"ResultsDir", layout.ResultsDir(), "results"},
-		{"TestResult", layout.TestResult(), filepath.Join("results", "test-result.json")},
 	}
 
 	for _, tt := range tests {
@@ -49,6 +52,19 @@ func TestNewLayout(t *testing.T) {
 				t.Errorf("%s() = %q, want %q", tt.name, tt.got, want)
 			}
 		})
+	}
+}
+
+func TestLayout_TestContext(t *testing.T) {
+	layout := NewLayout("/work", "myvm")
+	testLayout := layout.TestContext("case-01")
+
+	want := filepath.Join("/work", "myvm", "test.case-01")
+	if testLayout.Root != want {
+		t.Fatalf("Root = %q, want %q", testLayout.Root, want)
+	}
+	if testLayout.OverlayImage() != filepath.Join(want, "overlay.qcow2") {
+		t.Fatalf("OverlayImage() = %q", testLayout.OverlayImage())
 	}
 }
 
@@ -70,7 +86,7 @@ func TestCreateContext_AlreadyExists(t *testing.T) {
 		OS:        "linux",
 	}
 
-	err := CreateContext(layout, "", cfg, "/fake/base.qcow2", "")
+	err := CreateContext(layout, qemu.ResolveTools("qemu-system-x86_64"), cfg, "/fake/base.qcow2", "")
 	if err == nil {
 		t.Fatal("expected error when context directory already exists")
 	}
@@ -90,13 +106,11 @@ func TestLoadContext(t *testing.T) {
 
 	now := time.Now().Truncate(time.Second)
 	original := &VMConfig{
-		ImagePath:  "/images/test.qcow2",
-		ImageName:  "test-image",
-		OS:         "windows",
-		TPM:        true,
-		CreatedAt:  now,
-		SSHPort:    12345,
-		VNCDisplay: 3,
+		ImagePath: "/images/test.qcow2",
+		ImageName: "test-image",
+		OS:        "windows",
+		TPM:       true,
+		CreatedAt: now,
 	}
 
 	data, err := json.MarshalIndent(original, "", "  ")
@@ -125,11 +139,11 @@ func TestLoadContext(t *testing.T) {
 	if loaded.TPM != original.TPM {
 		t.Errorf("TPM = %v, want %v", loaded.TPM, original.TPM)
 	}
-	if loaded.SSHPort != original.SSHPort {
-		t.Errorf("SSHPort = %d, want %d", loaded.SSHPort, original.SSHPort)
+	if loaded.SSHPort != 0 {
+		t.Errorf("SSHPort = %d, want 0", loaded.SSHPort)
 	}
-	if loaded.VNCDisplay != original.VNCDisplay {
-		t.Errorf("VNCDisplay = %d, want %d", loaded.VNCDisplay, original.VNCDisplay)
+	if loaded.VNCDisplay != 0 {
+		t.Errorf("VNCDisplay = %d, want 0", loaded.VNCDisplay)
 	}
 }
 
@@ -186,6 +200,9 @@ func TestDestroyContext_NotExists(t *testing.T) {
 func TestFindFreePort(t *testing.T) {
 	port, err := findFreePort()
 	if err != nil {
+		if errors.Is(err, syscall.EPERM) || strings.Contains(err.Error(), "operation not permitted") {
+			t.Skipf("socket bind is not permitted in this environment: %v", err)
+		}
 		t.Fatalf("findFreePort failed: %v", err)
 	}
 	if port <= 0 {
@@ -199,18 +216,6 @@ func TestFindFreePort(t *testing.T) {
 	}
 	if port2 <= 0 {
 		t.Errorf("expected port2 > 0, got %d", port2)
-	}
-}
-
-// --- TestFindFreeVNCDisplay ---
-
-func TestFindFreeVNCDisplay(t *testing.T) {
-	display, err := findFreeVNCDisplay()
-	if err != nil {
-		t.Fatalf("findFreeVNCDisplay failed: %v", err)
-	}
-	if display < 0 {
-		t.Errorf("expected display >= 0, got %d", display)
 	}
 }
 
@@ -240,7 +245,7 @@ func TestCreateContext_Success(t *testing.T) {
 		TPM:       true,
 	}
 
-	err := CreateContext(layout, "", cfg, baseImage, "")
+	err := CreateContext(layout, qemu.ResolveTools("qemu-system-x86_64"), cfg, baseImage, "")
 	if err != nil {
 		t.Fatalf("CreateContext failed: %v", err)
 	}
@@ -256,11 +261,11 @@ func TestCreateContext_Success(t *testing.T) {
 		t.Fatalf("LoadContext after CreateContext failed: %v", err)
 	}
 
-	if loaded.SSHPort <= 0 {
-		t.Errorf("SSHPort = %d, expected > 0", loaded.SSHPort)
+	if loaded.SSHPort != 0 {
+		t.Errorf("SSHPort = %d, expected 0 in persisted config", loaded.SSHPort)
 	}
-	if loaded.VNCDisplay < 0 {
-		t.Errorf("VNCDisplay = %d, expected >= 0", loaded.VNCDisplay)
+	if loaded.VNCDisplay != 0 {
+		t.Errorf("VNCDisplay = %d, expected 0 in persisted config", loaded.VNCDisplay)
 	}
 
 	// Verify TPM directory was created
@@ -293,7 +298,7 @@ func TestCreateContext_WithoutTPM(t *testing.T) {
 		TPM:       false,
 	}
 
-	err := CreateContext(layout, "", cfg, baseImage, "")
+	err := CreateContext(layout, qemu.ResolveTools("qemu-system-x86_64"), cfg, baseImage, "")
 	if err != nil {
 		t.Fatalf("CreateContext failed: %v", err)
 	}
@@ -304,7 +309,32 @@ func TestCreateContext_WithoutTPM(t *testing.T) {
 	}
 }
 
-func TestCreateContext_AllocatesPortsForSplitMethods(t *testing.T) {
+func TestAllocateRuntimeResources_ForSplitMethods(t *testing.T) {
+	cfg := &VMConfig{
+		OS:         "windows",
+		ExecMethod: "winrm",
+		FileMethod: "ssh",
+	}
+
+	if err := AllocateRuntimeResources(cfg); err != nil {
+		if errors.Is(err, syscall.EPERM) || strings.Contains(err.Error(), "operation not permitted") {
+			t.Skipf("runtime resource allocation is not permitted in this environment: %v", err)
+		}
+		t.Fatalf("AllocateRuntimeResources failed: %v", err)
+	}
+
+	if cfg.SSHPort <= 0 {
+		t.Errorf("SSHPort = %d, expected > 0", cfg.SSHPort)
+	}
+	if cfg.WinRMPort <= 0 {
+		t.Errorf("WinRMPort = %d, expected > 0", cfg.WinRMPort)
+	}
+	if cfg.VNCDisplay < 0 {
+		t.Errorf("VNCDisplay = %d, expected >= 0", cfg.VNCDisplay)
+	}
+}
+
+func TestCreateContext_DoesNotPersistRuntimePortsForSplitMethods(t *testing.T) {
 	if _, err := exec.LookPath("qemu-img"); err != nil {
 		t.Skip("qemu-img not found, skipping test")
 	}
@@ -326,7 +356,7 @@ func TestCreateContext_AllocatesPortsForSplitMethods(t *testing.T) {
 		FileMethod: "ssh",
 	}
 
-	if err := CreateContext(layout, "", cfg, baseImage, ""); err != nil {
+	if err := CreateContext(layout, qemu.ResolveTools("qemu-system-x86_64"), cfg, baseImage, ""); err != nil {
 		t.Fatalf("CreateContext failed: %v", err)
 	}
 
@@ -335,10 +365,81 @@ func TestCreateContext_AllocatesPortsForSplitMethods(t *testing.T) {
 		t.Fatalf("LoadContext after CreateContext failed: %v", err)
 	}
 
-	if loaded.SSHPort <= 0 {
-		t.Errorf("SSHPort = %d, expected > 0", loaded.SSHPort)
+	if loaded.SSHPort != 0 {
+		t.Errorf("SSHPort = %d, expected 0 in persisted config", loaded.SSHPort)
 	}
-	if loaded.WinRMPort <= 0 {
-		t.Errorf("WinRMPort = %d, expected > 0", loaded.WinRMPort)
+	if loaded.WinRMPort != 0 {
+		t.Errorf("WinRMPort = %d, expected 0 in persisted config", loaded.WinRMPort)
+	}
+}
+
+func TestCreateTestContext(t *testing.T) {
+	if _, err := exec.LookPath("qemu-img"); err != nil {
+		t.Skip("qemu-img not found, skipping test")
+	}
+
+	dir := t.TempDir()
+	layout := NewLayout(dir, "base")
+	baseImage := filepath.Join(dir, "base.qcow2")
+	cmd := exec.Command("qemu-img", "create", "-f", "qcow2", baseImage, "1G")
+	if output, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("failed to create base image: %v\n%s", err, string(output))
+	}
+
+	cfg := &VMConfig{
+		ImagePath: baseImage,
+		ImageName: "test-image",
+		OS:        "windows",
+		TPM:       true,
+	}
+	if err := CreateContext(layout, qemu.ResolveTools("qemu-system-x86_64"), cfg, baseImage, ""); err != nil {
+		t.Fatalf("CreateContext failed: %v", err)
+	}
+
+	if err := os.WriteFile(layout.EFIVars(), []byte("efi-vars"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(layout.TPMDir(), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(layout.TPMDir(), "state.bin"), []byte("tpm-state"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	testLayout, err := CreateTestContext(layout, "case-01", qemu.ResolveTools("qemu-system-x86_64"), cfg)
+	if err != nil {
+		t.Fatalf("CreateTestContext failed: %v", err)
+	}
+
+	if _, err := os.Stat(testLayout.OverlayImage()); err != nil {
+		t.Fatalf("test overlay image missing: %v", err)
+	}
+	absBaseOverlay, err := filepath.Abs(layout.OverlayImage())
+	if err != nil {
+		t.Fatalf("failed to resolve absolute base overlay path: %v", err)
+	}
+	backingCmd := exec.Command("qemu-img", "info", "--output=json", testLayout.OverlayImage())
+	info, err := backingCmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("qemu-img info failed: %v\n%s", err, string(info))
+	}
+	if !strings.Contains(string(info), absBaseOverlay) {
+		t.Fatalf("external snapshot is not backed by base overlay: %s", string(info))
+	}
+
+	efiData, err := os.ReadFile(testLayout.EFIVars())
+	if err != nil {
+		t.Fatalf("failed to read copied EFI vars: %v", err)
+	}
+	if string(efiData) != "efi-vars" {
+		t.Fatalf("EFI vars = %q, want %q", string(efiData), "efi-vars")
+	}
+
+	tpmData, err := os.ReadFile(filepath.Join(testLayout.TPMDir(), "state.bin"))
+	if err != nil {
+		t.Fatalf("failed to read copied TPM state: %v", err)
+	}
+	if string(tpmData) != "tpm-state" {
+		t.Fatalf("TPM state = %q, want %q", string(tpmData), "tpm-state")
 	}
 }

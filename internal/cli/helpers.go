@@ -97,8 +97,9 @@ func createGuest(vmCfg *workspace.VMConfig) (guest.Guest, error) {
 
 // buildMachineConfig creates a qemu.MachineConfig from the VM config, layout, and global flags.
 func buildMachineConfig(globals *GlobalFlags, vmCfg *workspace.VMConfig, layout *workspace.Layout) *qemu.MachineConfig {
+	tools := globals.resolveTools()
 	cfg := &qemu.MachineConfig{
-		QemuPath:       globals.QemuPath,
+		QemuPath:       tools.QemuPath,
 		MachineName:    globals.VMName,
 		OverlayImage:   layout.OverlayImage(),
 		Firmware:       vmCfg.Firmware,

@@ -10,6 +10,8 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -24,9 +26,10 @@ import (
 
 // testFlags holds flags specific to the test command.
 type testFlags struct {
-	TestPath   string // --test: Test 정의 YAML 경로
-	OutputDir  string // --output: 테스트 결과 출력 디렉토리
-	NoShutdown bool   // --no-shutdown: 디버깅용, 실패 시 QEMU를 자동 종료하지 않음
+	TestPath        string // --test: Test 정의 YAML 경로
+	OutputDir       string // --output: 테스트 결과 출력 디렉터리
+	NoShutdown      bool   // --no-shutdown: 디버깅용, 실패 시 QEMU를 자동 종료하지 않음
+	KeepTestContext bool   // --keep-test-context: 테스트 종료 후 test context 디렉터리 유지
 }
 
 // newTestCommand creates the "test" subcommand.
@@ -47,6 +50,7 @@ the panic steps for diagnostics collection.`,
 	cmd.Flags().StringVar(&flags.TestPath, "test", "", "Path to test definition YAML (required)")
 	cmd.Flags().StringVar(&flags.OutputDir, "output", "", "Test result output directory (required)")
 	cmd.Flags().BoolVar(&flags.NoShutdown, "no-shutdown", false, "Debugging: do not shutdown QEMU on test failure, wait for manual exit")
+	cmd.Flags().BoolVar(&flags.KeepTestContext, "keep-test-context", false, "Keep the per-test context directory after the test finishes")
 	_ = cmd.MarkFlagRequired("test")
 	_ = cmd.MarkFlagRequired("output")
 
@@ -56,6 +60,7 @@ the panic steps for diagnostics collection.`,
 // runTest executes the test workflow.
 func runTest(globals *GlobalFlags, flags *testFlags) error {
 	ctx := context.Background()
+	tools := globals.resolveTools()
 
 	// 1. Load existing VM context
 	layout := workspace.NewLayout(globals.WorkDir, globals.VMName)
@@ -71,6 +76,27 @@ func runTest(globals *GlobalFlags, flags *testFlags) error {
 		return fmt.Errorf("failed to load test config: %w", err)
 	}
 	logging.Info("Loaded test config", "name", testCfg.Name, "steps", len(testCfg.Steps))
+
+	testContextName := buildTestContextName(testCfg.Name)
+	testLayout, err := workspace.CreateTestContext(layout, testContextName, tools, vmCfg)
+	if err != nil {
+		return fmt.Errorf("failed to create test context: %w", err)
+	}
+	if err := workspace.AllocateRuntimeResources(vmCfg); err != nil {
+		return fmt.Errorf("failed to allocate runtime resources: %w", err)
+	}
+	logging.Info("Created test context", "path", testLayout.Root)
+	defer func() {
+		if flags.KeepTestContext {
+			logging.Info("Keeping test context", "path", testLayout.Root)
+			return
+		}
+		if err := os.RemoveAll(testLayout.Root); err != nil {
+			logging.Warn("Failed to remove test context", "path", testLayout.Root, "error", err)
+			return
+		}
+		logging.Info("Removed test context", "path", testLayout.Root)
+	}()
 
 	// 3. Create output directory
 	if err := os.MkdirAll(flags.OutputDir, 0755); err != nil {
@@ -93,35 +119,16 @@ func runTest(globals *GlobalFlags, flags *testFlags) error {
 			_ = tpmProc.Stop()
 		}
 		// Remove daemon files
-		_ = os.Remove(layout.DaemonAddr())
-		_ = os.Remove(layout.DaemonPID())
+		_ = os.Remove(testLayout.DaemonAddr())
+		_ = os.Remove(testLayout.DaemonPID())
 	}
 
-	// 4. Restore snapshot on disk before starting QEMU (qemu-img + efivars/tpm copy)
-	snapPaths := &qemu.SnapshotPaths{
-		QemuImgPath:  qemu.ResolveQemuImg(globals.QemuPath),
-		OverlayImage: layout.OverlayImage(),
-		SnapshotDir:  layout.SnapshotDir(),
-		SnapshotName: "",
-	}
-	if _, statErr := os.Stat(layout.EFIVars()); statErr == nil {
-		snapPaths.EFIVars = layout.EFIVars()
-	}
-	if vmCfg.TPM {
-		snapPaths.TPMStateDir = layout.TPMDir()
-	}
-
-	if err := qemu.RestoreSnapshot(snapPaths); err != nil {
-		return fmt.Errorf("failed to restore snapshot: %w", err)
-	}
-	logging.Info("Snapshot restored")
-
-	// 5. Start TPM if enabled in context
+	// 4. Start TPM if enabled in context
 	if vmCfg.TPM {
 		tpmCfg := &qemu.TPMConfig{
-			StateDir:   layout.TPMDir(),
-			SocketPath: layout.TPMSocket(),
-			LogPath:    layout.TPMLog(),
+			StateDir:   testLayout.TPMDir(),
+			SocketPath: testLayout.TPMSocket(),
+			LogPath:    testLayout.TPMLog(),
 		}
 		tpmProc, err = qemu.StartTPM(ctx, tpmCfg)
 		if err != nil {
@@ -131,15 +138,15 @@ func runTest(globals *GlobalFlags, flags *testFlags) error {
 		logging.Info("TPM started")
 	}
 
-	// 6. Build MachineConfig and start QEMU
-	machineCfg := buildMachineConfig(globals, vmCfg, layout)
+	// 5. Build MachineConfig and start QEMU
+	machineCfg := buildMachineConfig(globals, vmCfg, testLayout)
 
 	machine, err = qemu.StartMachine(ctx, machineCfg)
 	if err != nil {
 		cleanup()
 		return fmt.Errorf("failed to start QEMU: %w", err)
 	}
-	logging.Info("QEMU started", "ssh_port", vmCfg.SSHPort, "vnc_display", vmCfg.VNCDisplay)
+	logging.Info("QEMU started", "ssh_port", vmCfg.SSHPort, "vnc_display", vmCfg.VNCDisplay, "test_context", testContextName)
 
 	// Monitor for QEMU exit — cancel context when QEMU terminates for any reason.
 	qemuCtx, qemuCancel := context.WithCancelCause(ctx)
@@ -157,7 +164,7 @@ func runTest(globals *GlobalFlags, flags *testFlags) error {
 	}()
 	ctx = qemuCtx
 
-	// 7. Create guest and action context
+	// 6. Create guest and action context
 	guest, err := createGuest(vmCfg)
 	if err != nil {
 		cleanup()
@@ -168,11 +175,11 @@ func runTest(globals *GlobalFlags, flags *testFlags) error {
 	actx := &action.ActionContext{
 		Machine: machine,
 		Guest:   guest,
-		WorkDir: layout.Root,
+		WorkDir: testLayout.Root,
 		TestDir: filepath.Dir(flags.TestPath),
 	}
 
-	// 8. Start IPC server
+	// 7. Start IPC server
 	ipcServer, err = ipc.StartServer(ctx, registry, actx)
 	if err != nil {
 		cleanup()
@@ -181,29 +188,29 @@ func runTest(globals *GlobalFlags, flags *testFlags) error {
 	logging.Info("IPC server started", "addr", ipcServer.Addr())
 
 	// Write daemon files
-	if err := os.WriteFile(layout.DaemonAddr(), []byte(ipcServer.Addr()), 0644); err != nil {
+	if err := os.WriteFile(testLayout.DaemonAddr(), []byte(ipcServer.Addr()), 0644); err != nil {
 		cleanup()
 		return fmt.Errorf("failed to write daemon.addr: %w", err)
 	}
-	if err := os.WriteFile(layout.DaemonPID(), []byte(strconv.Itoa(os.Getpid())), 0644); err != nil {
+	if err := os.WriteFile(testLayout.DaemonPID(), []byte(strconv.Itoa(os.Getpid())), 0644); err != nil {
 		cleanup()
 		return fmt.Errorf("failed to write daemon.pid: %w", err)
 	}
-	if err := os.WriteFile(layout.SSHPort(), []byte(strconv.Itoa(vmCfg.SSHPort)), 0644); err != nil {
+	if err := os.WriteFile(testLayout.SSHPort(), []byte(strconv.Itoa(vmCfg.SSHPort)), 0644); err != nil {
 		cleanup()
 		return fmt.Errorf("failed to write ssh.port: %w", err)
 	}
 	vncPort := qemu.VNCPort(vmCfg.VNCDisplay)
-	if err := os.WriteFile(layout.VNCPort(), []byte(strconv.Itoa(vncPort)), 0644); err != nil {
+	if err := os.WriteFile(testLayout.VNCPort(), []byte(strconv.Itoa(vncPort)), 0644); err != nil {
 		cleanup()
 		return fmt.Errorf("failed to write vnc.port: %w", err)
 	}
 
-	// 9. Start PanicHandler
+	// 8. Start PanicHandler
 	panicHandler := executor.NewPanicHandler(machine)
 	panicHandler.Start(ctx)
 
-	// 10. Run test steps with panic detection
+	// 9. Run test steps with panic detection
 	runner := executor.NewRunner(registry, actx)
 	result, err := runner.RunSteps(ctx, testCfg.Steps, panicHandler.PanicCh())
 	if err != nil {
@@ -211,7 +218,7 @@ func runTest(globals *GlobalFlags, flags *testFlags) error {
 		return fmt.Errorf("failed to run test steps: %w", err)
 	}
 
-	// 11. If panic detected, run panic steps
+	// 10. If panic detected, run panic steps
 	if result.PanicDetected && len(testCfg.Panic.Steps) > 0 {
 		logging.Warn("Panic detected, running panic steps")
 		panicResults, panicErr := runner.RunPanicSteps(ctx, testCfg.Panic.Steps)
@@ -221,7 +228,7 @@ func runTest(globals *GlobalFlags, flags *testFlags) error {
 		result.PanicSteps = panicResults
 	}
 
-	// 12. Write test result to output directory
+	// 11. Write test result to output directory
 	resultPath := filepath.Join(flags.OutputDir, "test-result.json")
 	resultData, err := json.MarshalIndent(result, "", "  ")
 	if err != nil {
@@ -252,7 +259,7 @@ func runTest(globals *GlobalFlags, flags *testFlags) error {
 	// Check if test failed
 	testFailed := (failed > 0 || result.PanicDetected)
 
-	// 13. Handle shutdown based on test result and --no-shutdown flag
+	// 12. Handle shutdown based on test result and --no-shutdown flag
 	if testFailed && flags.NoShutdown {
 		logging.Warn("Test failed but --no-shutdown is set. Waiting for QEMU to exit manually...")
 		fmt.Printf("Test %q failed: %d passed, %d failed, %d skipped\n", testCfg.Name, passed, failed, skipped)
@@ -284,8 +291,8 @@ func runTest(globals *GlobalFlags, flags *testFlags) error {
 	}
 
 	// Remove daemon files
-	_ = os.Remove(layout.DaemonAddr())
-	_ = os.Remove(layout.DaemonPID())
+	_ = os.Remove(testLayout.DaemonAddr())
+	_ = os.Remove(testLayout.DaemonPID())
 
 	// Print summary
 	fmt.Printf("Test %q complete: %d passed, %d failed, %d skipped\n", testCfg.Name, passed, failed, skipped)
@@ -298,4 +305,15 @@ func runTest(globals *GlobalFlags, flags *testFlags) error {
 	}
 
 	return nil
+}
+
+func buildTestContextName(testName string) string {
+	sanitized := strings.ToLower(testName)
+	sanitized = strings.ReplaceAll(sanitized, " ", "-")
+	sanitized = strings.ReplaceAll(sanitized, "/", "-")
+	sanitized = strings.ReplaceAll(sanitized, "\\", "-")
+	if sanitized == "" {
+		sanitized = "test"
+	}
+	return fmt.Sprintf("%s-%d", sanitized, time.Now().UnixNano())
 }

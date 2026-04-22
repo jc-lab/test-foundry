@@ -53,6 +53,7 @@ for later test execution.`,
 // runVMSetup executes the vm-setup workflow.
 func runVMSetup(globals *GlobalFlags, flags *vmSetupFlags) error {
 	ctx := context.Background()
+	tools := globals.resolveTools()
 
 	// 1. Load image config
 	imgCfg, err := config.LoadImageConfig(flags.ImagePath)
@@ -101,10 +102,14 @@ func runVMSetup(globals *GlobalFlags, flags *vmSetupFlags) error {
 		WinRMGuestPort: winrmGuestPort,
 	}
 
-	if err := workspace.CreateContext(layout, globals.QemuPath, vmCfg, imgCfg.QEMU.Image, imgCfg.QEMU.FirmwareVars); err != nil {
+	if err := workspace.CreateContext(layout, tools, vmCfg, imgCfg.QEMU.Image, imgCfg.QEMU.FirmwareVars); err != nil {
 		return fmt.Errorf("failed to create VM context: %w", err)
 	}
 	logging.Info("Created VM context", "path", layout.Root)
+
+	if err := workspace.AllocateRuntimeResources(vmCfg); err != nil {
+		return fmt.Errorf("failed to allocate runtime resources: %w", err)
+	}
 
 	// Track resources for cleanup
 	var tpmProc *qemu.TPMProcess
@@ -268,17 +273,9 @@ func runVMSetup(globals *GlobalFlags, flags *vmSetupFlags) error {
 
 	// 10. Save snapshot on disk (qemu-img + efivars/tpm copy)
 	snapPaths := &qemu.SnapshotPaths{
-		QemuImgPath:  qemu.ResolveQemuImg(globals.QemuPath),
+		QemuImgPath:  tools.QemuImgPath,
 		OverlayImage: layout.OverlayImage(),
-		EFIVars:      layout.EFIVars(),
-		SnapshotDir:  layout.SnapshotDir(),
 		SnapshotName: "",
-	}
-	if flags.TPM {
-		snapPaths.TPMStateDir = layout.TPMDir()
-	}
-	if imgCfg.QEMU.FirmwareVars == "" {
-		snapPaths.EFIVars = ""
 	}
 
 	if err := qemu.SaveSnapshot(snapPaths); err != nil {

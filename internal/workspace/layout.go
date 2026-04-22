@@ -17,6 +17,13 @@ func NewLayout(workdir, vmName string) *Layout {
 	}
 }
 
+// TestContext creates a child layout under the VM root for an individual test run.
+func (l *Layout) TestContext(name string) *Layout {
+	return &Layout{
+		Root: filepath.Join(l.Root, "test."+name),
+	}
+}
+
 // ConfigFile returns the path to config.json.
 func (l *Layout) ConfigFile() string {
 	return filepath.Join(l.Root, "config.json")
@@ -75,29 +82,4 @@ func (l *Layout) TPMSocket() string {
 // TPMLog returns the path to tpm/swtpm.log.
 func (l *Layout) TPMLog() string {
 	return filepath.Join(l.Root, "tpm", "swtpm.log")
-}
-
-// SnapshotDir returns the path to the snapshot/ directory.
-func (l *Layout) SnapshotDir() string {
-	return filepath.Join(l.Root, "snapshot")
-}
-
-// SnapshotEFIVars returns the path to snapshot/efivars.fd.
-func (l *Layout) SnapshotEFIVars() string {
-	return filepath.Join(l.Root, "snapshot", "efivars.fd")
-}
-
-// SnapshotTPMDir returns the path to snapshot/tpm/.
-func (l *Layout) SnapshotTPMDir() string {
-	return filepath.Join(l.Root, "snapshot", "tpm")
-}
-
-// ResultsDir returns the path to the results/ directory.
-func (l *Layout) ResultsDir() string {
-	return filepath.Join(l.Root, "results")
-}
-
-// TestResult returns the path to results/test-result.json.
-func (l *Layout) TestResult() string {
-	return filepath.Join(l.Root, "results", "test-result.json")
 }

@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/jc-lab/test-foundry/internal/logging"
+	"github.com/jc-lab/test-foundry/internal/qemu"
 )
 
 // GlobalFlags holds the common arguments shared across all commands.
@@ -18,6 +19,8 @@ type GlobalFlags struct {
 	QemuPath string // --qemu: QEMU 바이너리 경로
 	Headless bool   // --headless: display 없이 VNC만 활성화
 	Verbose  bool   // --verbose: 상세 로그 출력
+
+	tools *qemu.Tools
 }
 
 // NewRootCommand creates the root cobra command and registers all subcommands.
@@ -34,6 +37,7 @@ snapshot-based test execution, and step-by-step test automation.`,
 		SilenceErrors: true,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			logging.Setup(flags.Verbose)
+			flags.resolveTools()
 			return nil
 		},
 	}
@@ -53,6 +57,13 @@ snapshot-based test execution, and step-by-step test automation.`,
 	cmd.AddCommand(newActionCommand(flags))
 
 	return cmd
+}
+
+func (f *GlobalFlags) resolveTools() *qemu.Tools {
+	if f.tools == nil {
+		f.tools = qemu.ResolveTools(f.QemuPath)
+	}
+	return f.tools
 }
 
 // defaultQemuPath returns the default QEMU binary path based on the current OS.
