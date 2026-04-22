@@ -147,8 +147,10 @@ func TestRunSteps_ResolvesExpressionsAtRuntime(t *testing.T) {
 	if len(result.Steps) != 1 || result.Steps[0].Status != "passed" {
 		t.Fatalf("unexpected result: %#v", result.Steps)
 	}
-	if gotParams["path"] != filepath.Join(dir, "tests", "artifact.txt") {
-		t.Fatalf("path = %v, want %v", gotParams["path"], filepath.Join(dir, "tests", "artifact.txt"))
+	gotPath := filepath.Clean(fmt.Sprint(gotParams["path"]))
+	wantPath := filepath.Join(dir, "tests", "artifact.txt")
+	if gotPath != wantPath {
+		t.Fatalf("path = %v, want %v", gotPath, wantPath)
 	}
 	if gotParams["name"] != "test-vm" {
 		t.Fatalf("name = %v, want test-vm", gotParams["name"])
