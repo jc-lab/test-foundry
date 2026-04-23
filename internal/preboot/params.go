@@ -8,3 +8,9 @@ type EFIAddFileParams struct {
 	Src string `yaml:"src"`
 	Dst string `yaml:"dst"`
 }
+
+// EFIGetFileParams holds parameters for the efi-get-file action.
+type EFIGetFileParams struct {
+	Src string `yaml:"src"`
+	Dst string `yaml:"dst"`
+}

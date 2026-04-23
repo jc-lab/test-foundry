@@ -18,12 +18,14 @@ import (
 
 func TestNewRegistry(t *testing.T) {
 	r := NewRegistry()
-	act, err := r.Get("efi-add-file")
-	if err != nil {
-		t.Fatalf("expected efi-add-file to be registered: %v", err)
-	}
-	if act.Name() != "efi-add-file" {
-		t.Fatalf("action.Name() = %q", act.Name())
+	for _, name := range []string{"efi-add-file", "efi-get-file"} {
+		act, err := r.Get(name)
+		if err != nil {
+			t.Fatalf("expected %s to be registered: %v", name, err)
+		}
+		if act.Name() != name {
+			t.Fatalf("action.Name() = %q, want %q", act.Name(), name)
+		}
 	}
 }
 
@@ -72,6 +74,51 @@ func TestEFIAddFileAction(t *testing.T) {
 	}
 	if string(got) != string(want) {
 		t.Fatalf("EFI file contents = %q, want %q", string(got), string(want))
+	}
+}
+
+func TestEFIGetFileAction(t *testing.T) {
+	dir := t.TempDir()
+	overlay := filepath.Join(dir, "overlay.qcow2")
+	dst := filepath.Join(dir, "output", "BOOTX64.EFI")
+	want := []byte("hello-from-efi")
+
+	if err := createTestESPImage(overlay); err != nil {
+		t.Fatalf("failed to create test esp image: %v", err)
+	}
+
+	qcowFile, err := vfs.OpenQCOW2File(overlay)
+	if err != nil {
+		t.Fatalf("failed to open qcow image: %v", err)
+	}
+	fs, err := findEFIFAT32(qcowFile)
+	if err != nil {
+		t.Fatalf("failed to find EFI filesystem: %v", err)
+	}
+	file, err := fs.OpenFile("/EFI/Boot/BOOTX64.EFI", os.O_CREATE|os.O_RDWR|os.O_TRUNC)
+	if err != nil {
+		t.Fatalf("failed to create EFI source file: %v", err)
+	}
+	if _, err := file.Write(want); err != nil {
+		t.Fatalf("failed to seed EFI source file: %v", err)
+	}
+	_ = file.Close()
+	_ = qcowFile.Close()
+
+	action := &EFIGetFileAction{}
+	if err := action.Execute(context.Background(), &ActionContext{WorkDir: dir}, map[string]any{
+		"src": "/efi/boot/bootx64.efi",
+		"dst": dst,
+	}); err != nil {
+		t.Fatalf("Execute failed: %v", err)
+	}
+
+	got, err := os.ReadFile(dst)
+	if err != nil {
+		t.Fatalf("failed to read extracted EFI file: %v", err)
+	}
+	if string(got) != string(want) {
+		t.Fatalf("extracted EFI file contents = %q, want %q", string(got), string(want))
 	}
 }
 

@@ -25,6 +25,7 @@ type Registry struct {
 func NewRegistry() *Registry {
 	r := &Registry{actions: make(map[string]Action)}
 	r.Register(&EFIAddFileAction{})
+	r.Register(&EFIGetFileAction{})
 	return r
 }
 
