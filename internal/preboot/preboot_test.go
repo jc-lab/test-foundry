@@ -113,6 +113,7 @@ func createTestESPImage(filename string) error {
 	table := &gpt.Table{
 		Partitions: []*gpt.Partition{
 			{
+				Index: 1,
 				Start: partitionStart,
 				End:   partitionStart + partitionSectors - 1,
 				Size:  partitionBytes,
@@ -129,7 +130,7 @@ func createTestESPImage(filename string) error {
 	}
 
 	espStart := int64(partitionStart) * logicalBlock
-	fs, err := fat32.Create(qcowFile, int64(partitionBytes), espStart, logicalBlock, "TEST-ESP")
+	fs, err := fat32.Create(qcowFile, int64(partitionBytes), espStart, logicalBlock, "TEST-ESP", true)
 	if err != nil {
 		return err
 	}

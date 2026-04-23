@@ -61,7 +61,7 @@ func (a *EFIAddFileAction) Execute(ctx context.Context, actx *ActionContext, par
 		return fmt.Errorf("failed to create destination directories: %w", err)
 	}
 
-	file, err := fs.OpenFile(dstPath, os.O_RDWR|os.O_TRUNC)
+	file, err := fs.OpenFile(dstPath, os.O_CREATE|os.O_RDWR|os.O_TRUNC)
 	if err != nil {
 		return fmt.Errorf("failed to open destination file in EFI partition: %w", err)
 	}
