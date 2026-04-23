@@ -17,6 +17,7 @@ func TestBuildArgs_Basic(t *testing.T) {
 		MachineName:   "test-vm",
 		OverlayImage:  "/work/overlay.qcow2",
 		Memory:        "4G",
+		CPU:           "host",
 		CPUs:          2,
 		Headless:      true,
 		VNCDisplay:    1,
@@ -38,6 +39,7 @@ func TestBuildArgs_Basic(t *testing.T) {
 	assertContainsArg(t, args, "-m", "4G")
 
 	// CPU
+	assertContainsArg(t, args, "-cpu", "host")
 	assertContainsArg(t, args, "-smp", "2")
 
 	// virtio-scsi controller
@@ -110,6 +112,33 @@ func TestBuildArgs_Headless(t *testing.T) {
 		assertContainsArg(t, args, "-display", "gtk")
 		assertNotContainsArg(t, args, "-display", "none")
 	})
+}
+
+func TestBuildArgs_DefaultCPU(t *testing.T) {
+	cfg := &MachineConfig{
+		OverlayImage:  "/work/overlay.qcow2",
+		Memory:        "2G",
+		CPUs:          1,
+		QMPSocketPath: "/work/qmp.sock",
+		QMPPort:       4444,
+	}
+
+	args := cfg.BuildArgs()
+	assertContainsArg(t, args, "-cpu", "host")
+}
+
+func TestBuildArgs_CustomCPU(t *testing.T) {
+	cfg := &MachineConfig{
+		OverlayImage:  "/work/overlay.qcow2",
+		Memory:        "2G",
+		CPU:           "max",
+		CPUs:          1,
+		QMPSocketPath: "/work/qmp.sock",
+		QMPPort:       4444,
+	}
+
+	args := cfg.BuildArgs()
+	assertContainsArg(t, args, "-cpu", "max")
 }
 
 // --- TestBuildArgs_UEFI ---

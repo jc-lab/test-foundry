@@ -28,6 +28,7 @@ type QEMUConfig struct {
 	Firmware     string   `yaml:"firmware"`
 	FirmwareVars string   `yaml:"firmware_vars"`
 	Memory       string   `yaml:"memory"`
+	CPU          string   `yaml:"cpu"`
 	CPUs         int      `yaml:"cpus"`
 	ExtraArgs    []string `yaml:"extra_args"`
 }
@@ -94,6 +95,9 @@ func (c *ImageConfig) validate() error {
 
 	if c.QEMU.Memory == "" {
 		c.QEMU.Memory = "2G"
+	}
+	if c.QEMU.CPU == "" {
+		c.QEMU.CPU = "host"
 	}
 
 	if c.QEMU.CPUs <= 0 {

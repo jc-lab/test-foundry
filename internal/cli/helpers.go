@@ -104,6 +104,7 @@ func buildMachineConfig(globals *GlobalFlags, vmCfg *workspace.VMConfig, layout 
 		OverlayImage:   layout.OverlayImage(),
 		Firmware:       vmCfg.Firmware,
 		Memory:         vmCfg.Memory,
+		CPU:            vmCfg.CPU,
 		CPUs:           vmCfg.CPUs,
 		Headless:       globals.Headless,
 		VNCDisplay:     vmCfg.VNCDisplay,

@@ -115,6 +115,9 @@ setup:
 		if cfg.QEMU.Memory != "4G" {
 			t.Errorf("QEMU.Memory = %q, want %q", cfg.QEMU.Memory, "4G")
 		}
+		if cfg.QEMU.CPU != "host" {
+			t.Errorf("QEMU.CPU = %q, want %q", cfg.QEMU.CPU, "host")
+		}
 		if cfg.QEMU.CPUs != 4 {
 			t.Errorf("QEMU.CPUs = %d, want %d", cfg.QEMU.CPUs, 4)
 		}
@@ -305,8 +308,35 @@ connection:
 		if cfg.QEMU.CPUs != 2 {
 			t.Errorf("default QEMU.CPUs = %d, want 2", cfg.QEMU.CPUs)
 		}
+		if cfg.QEMU.CPU != "host" {
+			t.Errorf("default QEMU.CPU = %q, want %q", cfg.QEMU.CPU, "host")
+		}
 		if cfg.QEMU.Memory != "2G" {
 			t.Errorf("default QEMU.Memory = %q, want %q", cfg.QEMU.Memory, "2G")
+		}
+	})
+
+	t.Run("custom_qemu_cpu", func(t *testing.T) {
+		imgPath := createTempImage(t)
+		yamlContent := `
+name: test
+os: linux
+qemu:
+  image: ` + imgPath + `
+  cpu: max
+connection:
+  username: user
+  password: pass
+`
+		tmpFile := filepath.Join(t.TempDir(), "image.yaml")
+		os.WriteFile(tmpFile, []byte(yamlContent), 0644)
+
+		cfg, err := LoadImageConfig(tmpFile)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if cfg.QEMU.CPU != "max" {
+			t.Errorf("QEMU.CPU = %q, want %q", cfg.QEMU.CPU, "max")
 		}
 	})
 

@@ -16,6 +16,7 @@ type MachineConfig struct {
 	Firmware       string   `json:"firmware,omitempty"`
 	FirmwareVars   string   `json:"firmware_vars,omitempty"`
 	Memory         string   `json:"memory"`
+	CPU            string   `json:"cpu"`
 	CPUs           int      `json:"cpus"`
 	Headless       bool     `json:"headless"`
 	VNCDisplay     int      `json:"vnc_display"`
@@ -40,7 +41,7 @@ func (c *MachineConfig) BuildArgs() []string {
 
 	// 2. Memory and CPU
 	args = append(args, "-m", c.Memory)
-	args = append(args, "-cpu", "host")
+	args = append(args, "-cpu", c.cpuValue())
 	args = append(args, "-smp", fmt.Sprintf("%d", c.CPUs))
 
 	args = append(args, "-monitor", "vc")
@@ -141,4 +142,11 @@ func (c *MachineConfig) QMPEndpoint() string {
 		return fmt.Sprintf("127.0.0.1:%d", c.QMPPort)
 	}
 	return c.QMPSocketPath
+}
+
+func (c *MachineConfig) cpuValue() string {
+	if c.CPU == "" {
+		return "host"
+	}
+	return c.CPU
 }
