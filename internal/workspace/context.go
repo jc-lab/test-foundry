@@ -42,6 +42,7 @@ type VMConfig struct {
 	SSHPort    int `json:"-"`
 	WinRMPort  int `json:"-"`
 	VNCDisplay int `json:"-"`
+	QMPPort    int `json:"-"`
 
 	// Connection settings (copied from image config)
 	ExecMethod     string `json:"exec_method"`
@@ -246,6 +247,16 @@ func AllocateRuntimeResources(cfg *VMConfig) error {
 		return fmt.Errorf("failed to allocate VNC display: %w", err)
 	}
 	cfg.VNCDisplay = vncDisplay
+
+	if qemu.HostUsesQMPTCP() {
+		qmpPort, err := findFreePort()
+		if err != nil {
+			return fmt.Errorf("failed to allocate QMP port: %w", err)
+		}
+		cfg.QMPPort = qmpPort
+	} else {
+		cfg.QMPPort = 0
+	}
 	return nil
 }
 

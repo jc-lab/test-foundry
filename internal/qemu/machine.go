@@ -111,8 +111,6 @@ func StartMachine(ctx context.Context, config *MachineConfig) (*Machine, error) 
 
 // connectQMP waits for the QMP socket to become available and connects.
 func (m *Machine) connectQMP(ctx context.Context) error {
-	socketPath := m.Config.QMPSocketPath
-
 	for i := 0; i < 60; i++ { // max 30 seconds
 		select {
 		case <-ctx.Done():
@@ -120,19 +118,30 @@ func (m *Machine) connectQMP(ctx context.Context) error {
 		default:
 		}
 
-		if _, err := os.Stat(socketPath); err == nil {
-			conn, err := net.DialTimeout("unix", socketPath, 2*time.Second)
+		if m.Config.usesQMPTCP() {
+			addr := m.Config.QMPEndpoint()
+			conn, err := net.DialTimeout("tcp", addr, 2*time.Second)
 			if err == nil {
 				m.qmpConn = conn
 				m.reader = bufio.NewReader(conn)
 				return nil
+			}
+		} else {
+			socketPath := m.Config.QMPSocketPath
+			if _, err := os.Stat(socketPath); err == nil {
+				conn, err := net.DialTimeout("unix", socketPath, 2*time.Second)
+				if err == nil {
+					m.qmpConn = conn
+					m.reader = bufio.NewReader(conn)
+					return nil
+				}
 			}
 		}
 
 		time.Sleep(500 * time.Millisecond)
 	}
 
-	return fmt.Errorf("QMP socket did not become available: %s", socketPath)
+	return fmt.Errorf("QMP endpoint did not become available: %s", m.Config.QMPEndpoint())
 }
 
 // handshake performs the QMP capabilities negotiation.

@@ -108,6 +108,7 @@ func buildMachineConfig(globals *GlobalFlags, vmCfg *workspace.VMConfig, layout 
 		Headless:       globals.Headless,
 		VNCDisplay:     vmCfg.VNCDisplay,
 		QMPSocketPath:  layout.QMPSocket(),
+		QMPPort:        vmCfg.QMPPort,
 		SSHHostPort:    vmCfg.SSHPort,
 		SSHGuestPort:   vmCfg.SSHGuestPort,
 		WinRMHostPort:  vmCfg.WinRMPort,

@@ -84,7 +84,7 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 		Status:    "running",
 		SSHPort:   s.actx.Machine.Config.SSHHostPort,
 		VNCPort:   5900 + s.actx.Machine.Config.VNCDisplay,
-		QMPSocket: s.actx.Machine.Config.QMPSocketPath,
+		QMPSocket: s.actx.Machine.Config.QMPEndpoint(),
 		TPM:       s.actx.Machine.Config.TPMEnabled,
 	}
 

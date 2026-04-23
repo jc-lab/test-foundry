@@ -332,6 +332,13 @@ func TestAllocateRuntimeResources_ForSplitMethods(t *testing.T) {
 	if cfg.VNCDisplay < 0 {
 		t.Errorf("VNCDisplay = %d, expected >= 0", cfg.VNCDisplay)
 	}
+	if qemu.HostUsesQMPTCP() {
+		if cfg.QMPPort <= 0 {
+			t.Errorf("QMPPort = %d, expected > 0", cfg.QMPPort)
+		}
+	} else if cfg.QMPPort != 0 {
+		t.Errorf("QMPPort = %d, expected 0 on non-Windows hosts", cfg.QMPPort)
+	}
 }
 
 func TestCreateContext_DoesNotPersistRuntimePortsForSplitMethods(t *testing.T) {

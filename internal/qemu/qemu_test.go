@@ -21,6 +21,7 @@ func TestBuildArgs_Basic(t *testing.T) {
 		Headless:      true,
 		VNCDisplay:    1,
 		QMPSocketPath: "/work/qmp.sock",
+		QMPPort:       4444,
 		SSHHostPort:   2222,
 		SSHGuestPort:  22,
 		SerialLog:     "/work/serial.log",
@@ -56,7 +57,7 @@ func TestBuildArgs_Basic(t *testing.T) {
 
 	// QMP socket
 	if runtime.GOOS == "windows" {
-		if !strings.Contains(argStr, "tcp:127.0.0.1:/work/qmp.sock,server,nowait") {
+		if !strings.Contains(argStr, "tcp:127.0.0.1:4444,server,nowait") {
 			t.Errorf("expected QMP TCP arg on windows, got: %s", argStr)
 		}
 	} else {
@@ -89,6 +90,7 @@ func TestBuildArgs_Headless(t *testing.T) {
 			CPUs:          1,
 			Headless:      true,
 			QMPSocketPath: "/work/qmp.sock",
+			QMPPort:       4444,
 		}
 		args := cfg.BuildArgs()
 		assertContainsArg(t, args, "-display", "none")
@@ -102,6 +104,7 @@ func TestBuildArgs_Headless(t *testing.T) {
 			CPUs:          1,
 			Headless:      false,
 			QMPSocketPath: "/work/qmp.sock",
+			QMPPort:       4444,
 		}
 		args := cfg.BuildArgs()
 		assertContainsArg(t, args, "-display", "gtk")
@@ -119,6 +122,7 @@ func TestBuildArgs_UEFI(t *testing.T) {
 		Firmware:      "/usr/share/OVMF/OVMF_CODE.fd",
 		FirmwareVars:  "/work/efivars.fd",
 		QMPSocketPath: "/work/qmp.sock",
+		QMPPort:       4444,
 	}
 
 	args := cfg.BuildArgs()
@@ -141,6 +145,7 @@ func TestBuildArgs_NoUEFI(t *testing.T) {
 		Memory:        "2G",
 		CPUs:          1,
 		QMPSocketPath: "/work/qmp.sock",
+		QMPPort:       4444,
 	}
 
 	args := cfg.BuildArgs()
@@ -157,6 +162,7 @@ func TestBuildArgs_NoPortForwarding(t *testing.T) {
 		Memory:        "2G",
 		CPUs:          1,
 		QMPSocketPath: "/work/qmp.sock",
+		QMPPort:       4444,
 	}
 
 	args := cfg.BuildArgs()
@@ -179,6 +185,7 @@ func TestBuildArgs_TPM(t *testing.T) {
 			TPMEnabled:    true,
 			TPMSocketPath: "/work/tpm/swtpm.sock",
 			QMPSocketPath: "/work/qmp.sock",
+			QMPPort:       4444,
 		}
 
 		args := cfg.BuildArgs()
@@ -200,6 +207,7 @@ func TestBuildArgs_TPM(t *testing.T) {
 			CPUs:          1,
 			TPMEnabled:    false,
 			QMPSocketPath: "/work/qmp.sock",
+			QMPPort:       4444,
 		}
 
 		args := cfg.BuildArgs()
@@ -218,6 +226,7 @@ func TestBuildArgs_TPM(t *testing.T) {
 			TPMEnabled:    true,
 			TPMSocketPath: "", // empty socket path
 			QMPSocketPath: "/work/qmp.sock",
+			QMPPort:       4444,
 		}
 
 		args := cfg.BuildArgs()
@@ -238,6 +247,7 @@ func TestBuildArgs_ExtraArgs(t *testing.T) {
 		Memory:        "2G",
 		CPUs:          1,
 		QMPSocketPath: "/work/qmp.sock",
+		QMPPort:       4444,
 		ExtraArgs:     []string{"-usb", "-device", "usb-tablet"},
 	}
 
@@ -276,10 +286,29 @@ func TestDetectAccelerator(t *testing.T) {
 		Memory:        "2G",
 		CPUs:          1,
 		QMPSocketPath: "/work/qmp.sock",
+		QMPPort:       4444,
 	}
 	args := cfg.BuildArgs()
 	expectedMachine := "q35,accel=" + accel
 	assertContainsArg(t, args, "-machine", expectedMachine)
+}
+
+func TestQMPEndpoint(t *testing.T) {
+	cfg := &MachineConfig{
+		QMPSocketPath: "/work/qmp.sock",
+		QMPPort:       4444,
+	}
+
+	if runtime.GOOS == "windows" {
+		if got := cfg.QMPEndpoint(); got != "127.0.0.1:4444" {
+			t.Fatalf("QMPEndpoint() = %q, want %q", got, "127.0.0.1:4444")
+		}
+		return
+	}
+
+	if got := cfg.QMPEndpoint(); got != "/work/qmp.sock" {
+		t.Fatalf("QMPEndpoint() = %q, want %q", got, "/work/qmp.sock")
+	}
 }
 
 // --- TestFindFreeVNCDisplay ---

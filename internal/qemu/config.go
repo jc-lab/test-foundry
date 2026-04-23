@@ -20,6 +20,7 @@ type MachineConfig struct {
 	Headless       bool     `json:"headless"`
 	VNCDisplay     int      `json:"vnc_display"`
 	QMPSocketPath  string   `json:"qmp_socket_path"`
+	QMPPort        int      `json:"qmp_port,omitempty"`
 	SSHHostPort    int      `json:"ssh_host_port,omitempty"`
 	SSHGuestPort   int      `json:"ssh_guest_port,omitempty"`
 	WinRMHostPort  int      `json:"winrm_host_port,omitempty"`  // WinRM host forwarding port (0 = disabled)
@@ -72,9 +73,9 @@ func (c *MachineConfig) BuildArgs() []string {
 	args = append(args, "-vnc", fmt.Sprintf(":%d", c.VNCDisplay))
 
 	// 8. QMP socket
-	if runtime.GOOS == "windows" {
+	if c.usesQMPTCP() {
 		// Windows: use TCP instead of UNIX socket
-		args = append(args, "-qmp", fmt.Sprintf("tcp:127.0.0.1:%s,server,nowait", c.QMPSocketPath))
+		args = append(args, "-qmp", fmt.Sprintf("tcp:127.0.0.1:%d,server,nowait", c.QMPPort))
 	} else {
 		args = append(args, "-qmp", fmt.Sprintf("unix:%s,server,nowait", c.QMPSocketPath))
 	}
@@ -125,4 +126,19 @@ func detectAccelerator() string {
 	default:
 		return "tcg"
 	}
+}
+
+func HostUsesQMPTCP() bool {
+	return runtime.GOOS == "windows"
+}
+
+func (c *MachineConfig) usesQMPTCP() bool {
+	return HostUsesQMPTCP()
+}
+
+func (c *MachineConfig) QMPEndpoint() string {
+	if c.usesQMPTCP() {
+		return fmt.Sprintf("127.0.0.1:%d", c.QMPPort)
+	}
+	return c.QMPSocketPath
 }
