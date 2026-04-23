@@ -70,6 +70,7 @@ func NewRegistry() *Registry {
 	r.Register(&ExecAction{})
 	r.Register(&ScreenshotAction{})
 	r.Register(&ShutdownAction{})
+	r.Register(&PoweroffAction{})
 	r.Register(&RebootAction{})
 	r.Register(&WaitResetAction{})
 	r.Register(&DumpAction{})

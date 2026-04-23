@@ -58,5 +58,25 @@ setup:
           - "-Command"
           - "Start-Service sshd"
 
+    - action: exec
+      timeout: 60s
+      params:
+        cmd: "sc.exe"
+        args:
+          - "config"
+          - "pvpanic"
+          - "start="
+          - "boot"
+
+    - action: exec
+      timeout: 60s
+      params:
+        cmd: "sc.exe"
+        args:
+          - "config"
+          - "fwcfg"
+          - "start="
+          - "boot"
+
     - action: shutdown
       timeout: 120s

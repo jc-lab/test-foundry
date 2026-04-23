@@ -85,6 +85,7 @@ func TestNewRegistry(t *testing.T) {
 		"exec",
 		"screenshot",
 		"shutdown",
+		"poweroff",
 		"reboot",
 		"wait-reset",
 		"dump",
@@ -101,11 +102,6 @@ func TestNewRegistry(t *testing.T) {
 		if act.Name() != name {
 			t.Errorf("action.Name() = %q, want %q", act.Name(), name)
 		}
-	}
-
-	// Verify we have exactly 12 actions
-	if len(expectedActions) != 12 {
-		t.Errorf("expected 12 actions, listed %d", len(expectedActions))
 	}
 }
 
@@ -189,6 +185,15 @@ func TestSleepAction(t *testing.T) {
 			t.Fatal("expected error due to context cancellation")
 		}
 	})
+}
+
+func TestPoweroffAction(t *testing.T) {
+	action := &PoweroffAction{}
+
+	err := action.Execute(context.Background(), &ActionContext{}, nil)
+	if err == nil {
+		t.Fatal("expected error when machine is missing")
+	}
 }
 
 // --- TestFileUploadAction_MissingParams ---

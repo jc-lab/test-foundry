@@ -126,6 +126,44 @@ setup:
 		}
 	})
 
+	t.Run("preboot_defaults_timeout", func(t *testing.T) {
+		imgPath := createTempImage(t)
+		yamlContent := `
+name: test-preboot
+os: windows
+qemu:
+  image: ` + imgPath + `
+connection:
+  username: testuser
+  password: testpass
+preboot:
+  steps:
+    - action: efi-add-file
+      params:
+        src: ./bootx64.efi
+        dst: /EFI/Boot/bootx64.efi
+setup:
+  steps:
+    - action: wait-boot
+      timeout: 120s
+`
+		tmpFile := filepath.Join(t.TempDir(), "image.yaml")
+		if err := os.WriteFile(tmpFile, []byte(yamlContent), 0644); err != nil {
+			t.Fatal(err)
+		}
+
+		cfg, err := LoadImageConfig(tmpFile)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(cfg.Preboot.Steps) != 1 {
+			t.Fatalf("Preboot.Steps len = %d, want 1", len(cfg.Preboot.Steps))
+		}
+		if cfg.Preboot.Steps[0].Timeout.Duration != 30*time.Second {
+			t.Fatalf("Preboot timeout = %v, want %v", cfg.Preboot.Steps[0].Timeout.Duration, 30*time.Second)
+		}
+	})
+
 	t.Run("missing_name", func(t *testing.T) {
 		imgPath := createTempImage(t)
 		yamlContent := `
@@ -473,6 +511,12 @@ steps:
 		dir := t.TempDir()
 		yamlContent := `
 name: expr-test
+preboot:
+  steps:
+    - action: efi-add-file
+      params:
+        src: "${{ test.dir }}/bootx64.efi"
+        dst: /EFI/Boot/bootx64.efi
 steps:
   - action: file-upload
     timeout: 10s
@@ -489,6 +533,39 @@ steps:
 
 		if got := cfg.Steps[0].Params["src"]; got != "${{ test.dir }}/fixtures/setup.ps1" {
 			t.Fatalf("src = %v, want raw expression", got)
+		}
+		if got := cfg.Preboot.Steps[0].Params["src"]; got != "${{ test.dir }}/bootx64.efi" {
+			t.Fatalf("preboot src = %v, want raw expression", got)
+		}
+	})
+
+	t.Run("preboot_defaults_timeout", func(t *testing.T) {
+		yamlContent := `
+name: preboot-test
+preboot:
+  steps:
+    - action: efi-add-file
+      params:
+        src: ./bootx64.efi
+        dst: /EFI/Boot/bootx64.efi
+steps:
+  - action: exec
+    timeout: 10s
+    params:
+      cmd: echo
+`
+		tmpFile := filepath.Join(t.TempDir(), "test.yaml")
+		os.WriteFile(tmpFile, []byte(yamlContent), 0644)
+
+		cfg, err := LoadTestConfig(tmpFile)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(cfg.Preboot.Steps) != 1 {
+			t.Fatalf("len(Preboot.Steps) = %d, want 1", len(cfg.Preboot.Steps))
+		}
+		if cfg.Preboot.Steps[0].Timeout.Duration != 30*time.Second {
+			t.Fatalf("Preboot timeout = %v, want 30s", cfg.Preboot.Steps[0].Timeout.Duration)
 		}
 	})
 }
@@ -532,6 +609,45 @@ steps:
 		}
 		if cfg.Panic.Steps[0].Action != "screenshot" {
 			t.Errorf("Panic.Steps[0].Action = %q, want %q", cfg.Panic.Steps[0].Action, "screenshot")
+		}
+	})
+
+	t.Run("include_provides_preboot_steps", func(t *testing.T) {
+		dir := t.TempDir()
+
+		includeContent := `
+preboot:
+  steps:
+    - action: efi-add-file
+      params:
+        src: "${{ test.dir }}/bootx64.efi"
+        dst: /EFI/Boot/bootx64.efi
+`
+		os.WriteFile(filepath.Join(dir, "include.yaml"), []byte(includeContent), 0644)
+
+		mainContent := `
+name: test-with-preboot-include
+include:
+  - include.yaml
+steps:
+  - action: exec
+    timeout: 10s
+    params:
+      cmd: echo
+`
+		mainFile := filepath.Join(dir, "test.yaml")
+		os.WriteFile(mainFile, []byte(mainContent), 0644)
+
+		cfg, err := LoadTestConfig(mainFile)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		if len(cfg.Preboot.Steps) != 1 {
+			t.Fatalf("len(Preboot.Steps) = %d, want 1", len(cfg.Preboot.Steps))
+		}
+		if cfg.Preboot.Steps[0].Action != "efi-add-file" {
+			t.Errorf("Preboot.Steps[0].Action = %q, want %q", cfg.Preboot.Steps[0].Action, "efi-add-file")
 		}
 	})
 

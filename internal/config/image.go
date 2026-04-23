@@ -6,6 +6,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"gopkg.in/yaml.v3"
 )
@@ -17,6 +18,7 @@ type ImageConfig struct {
 	Description string           `yaml:"description"`
 	QEMU        QEMUConfig       `yaml:"qemu"`
 	Connection  ConnectionConfig `yaml:"connection"`
+	Preboot     SetupConfig      `yaml:"preboot"`
 	Setup       SetupConfig      `yaml:"setup"`
 }
 
@@ -148,6 +150,24 @@ func (c *ImageConfig) validate() error {
 			c.Connection.WinRMPort = 5986
 		} else {
 			c.Connection.WinRMPort = 5985
+		}
+	}
+
+	for i := range c.Preboot.Steps {
+		if c.Preboot.Steps[i].Action == "" {
+			return fmt.Errorf("image config: preboot.steps[%d] has empty action", i)
+		}
+		if c.Preboot.Steps[i].Timeout.Duration <= 0 {
+			c.Preboot.Steps[i].Timeout.Duration = 30 * time.Second
+		}
+	}
+
+	for i := range c.Setup.Steps {
+		if c.Setup.Steps[i].Action == "" {
+			return fmt.Errorf("image config: setup.steps[%d] has empty action", i)
+		}
+		if c.Setup.Steps[i].Timeout.Duration <= 0 {
+			return fmt.Errorf("image config: setup.steps[%d] (%s) has invalid timeout", i, c.Setup.Steps[i].Action)
 		}
 	}
 

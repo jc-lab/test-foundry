@@ -31,6 +31,7 @@ on the guest OS or QEMU instance.`,
 	cmd.AddCommand(newActionExecCommand(globals))
 	cmd.AddCommand(newActionScreenshotCommand(globals))
 	cmd.AddCommand(newActionShutdownCommand(globals))
+	cmd.AddCommand(newActionPoweroffCommand(globals))
 	cmd.AddCommand(newActionRebootCommand(globals))
 	cmd.AddCommand(newActionDumpCommand(globals))
 	cmd.AddCommand(newActionSleepCommand(globals))
@@ -273,6 +274,33 @@ func newActionShutdownCommand(globals *GlobalFlags) *cobra.Command {
 			return fmt.Errorf("shutdown failed: %w", err)
 		}
 		fmt.Println("Guest shutdown initiated.")
+		return nil
+	}
+
+	return cmd
+}
+
+// newActionPoweroffCommand creates the "action poweroff" subcommand.
+func newActionPoweroffCommand(globals *GlobalFlags) *cobra.Command {
+	var timeout int
+
+	cmd := &cobra.Command{
+		Use:   "poweroff",
+		Short: "Forcefully power off the VM",
+	}
+
+	cmd.Flags().IntVar(&timeout, "timeout", 30, "Timeout in seconds")
+
+	cmd.RunE = func(cmd *cobra.Command, args []string) error {
+		client, err := createIPCClient(globals)
+		if err != nil {
+			return err
+		}
+		_, err = executeWithParams(context.Background(), client, "poweroff", map[string]any{}, timeout)
+		if err != nil {
+			return fmt.Errorf("poweroff failed: %w", err)
+		}
+		fmt.Println("VM powered off.")
 		return nil
 	}
 

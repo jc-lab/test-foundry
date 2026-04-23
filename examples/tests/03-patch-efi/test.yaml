@@ -1,0 +1,30 @@
+# Copyright 2026 JC-Lab
+# SPDX-License-Identifier: GPL-2.0-only
+
+name: "patch-efi"
+description: ""
+
+preboot:
+  steps:
+    - action: efi-add-file
+      params:
+        src: "${{ test.dir }}/shellx64.efi"
+        dst: "/EFI/Microsoft/Boot/bootmgfw.efi"
+    - action: efi-add-file
+      params:
+        src: "${{ test.dir }}/shellx64.efi"
+        dst: "/EFI/Boot/bootx64.efi"
+
+steps:
+  - action: sleep
+    timeout: 11s
+    params:
+      duration: 5s
+
+  - action: screenshot
+    timeout: 10s
+    params:
+      output: "./output/03/screenshot.png"
+
+  - action: poweroff
+    timeout: 10s

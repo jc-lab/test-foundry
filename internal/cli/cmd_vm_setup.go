@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 
 	"github.com/spf13/cobra"
@@ -16,6 +17,7 @@ import (
 	"github.com/jc-lab/test-foundry/internal/executor"
 	"github.com/jc-lab/test-foundry/internal/ipc"
 	"github.com/jc-lab/test-foundry/internal/logging"
+	"github.com/jc-lab/test-foundry/internal/preboot"
 	"github.com/jc-lab/test-foundry/internal/qemu"
 	"github.com/jc-lab/test-foundry/internal/workspace"
 )
@@ -106,6 +108,25 @@ func runVMSetup(globals *GlobalFlags, flags *vmSetupFlags) error {
 		return fmt.Errorf("failed to create VM context: %w", err)
 	}
 	logging.Info("Created VM context", "path", layout.Root)
+
+	if len(imgCfg.Preboot.Steps) > 0 {
+		registry := preboot.NewRegistry()
+		actx := &preboot.ActionContext{
+			WorkDir: layout.Root,
+			TestDir: filepath.Dir(flags.ImagePath),
+		}
+		runner := preboot.NewRunner(registry, actx)
+		result, err := runner.RunSteps(ctx, imgCfg.Preboot.Steps)
+		if err != nil {
+			return fmt.Errorf("failed to run preboot steps: %w", err)
+		}
+		for _, step := range result.Steps {
+			if step.Status == "failed" {
+				return fmt.Errorf("preboot step failed: %s: %s", step.Action, step.Error)
+			}
+		}
+		logging.Info("All preboot steps completed successfully")
+	}
 
 	if err := workspace.AllocateRuntimeResources(vmCfg); err != nil {
 		return fmt.Errorf("failed to allocate runtime resources: %w", err)

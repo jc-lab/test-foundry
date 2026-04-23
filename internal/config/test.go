@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"gopkg.in/yaml.v3"
 )
@@ -16,6 +17,7 @@ type TestConfig struct {
 	Name        string      `yaml:"name"`
 	Description string      `yaml:"description"`
 	Include     []string    `yaml:"include"`
+	Preboot     SetupConfig `yaml:"preboot"`
 	Steps       []Step      `yaml:"steps"`
 	Panic       PanicConfig `yaml:"panic"`
 }
@@ -54,7 +56,7 @@ func LoadTestConfig(path string) (*TestConfig, error) {
 // Merge rules:
 //   - Include files are loaded in order.
 //   - If the main YAML defines a field, it takes precedence (override).
-//   - For array fields (steps, panic.steps), if the main defines them, includes are ignored.
+//   - For array fields (preboot.steps, steps, panic.steps), if the main defines them, includes are ignored.
 //   - Only 1-depth includes (nested includes in include files are not processed).
 func (c *TestConfig) processIncludes(baseDir string) error {
 	if len(c.Include) == 0 {
@@ -62,10 +64,12 @@ func (c *TestConfig) processIncludes(baseDir string) error {
 	}
 
 	// Save main config's arrays to detect if they were explicitly defined
+	mainHasPrebootSteps := len(c.Preboot.Steps) > 0
 	mainHasSteps := len(c.Steps) > 0
 	mainHasPanicSteps := len(c.Panic.Steps) > 0
 
 	// Merged values from includes (last wins among includes)
+	var mergedPrebootSteps []Step
 	var mergedSteps []Step
 	var mergedPanicSteps []Step
 
@@ -82,6 +86,9 @@ func (c *TestConfig) processIncludes(baseDir string) error {
 			return fmt.Errorf("failed to parse include file %q: %w", includePath, err)
 		}
 
+		if len(inc.Preboot.Steps) > 0 {
+			mergedPrebootSteps = inc.Preboot.Steps
+		}
 		if len(inc.Steps) > 0 {
 			mergedSteps = inc.Steps
 		}
@@ -91,6 +98,9 @@ func (c *TestConfig) processIncludes(baseDir string) error {
 	}
 
 	// Apply merge: main overrides includes
+	if !mainHasPrebootSteps && len(mergedPrebootSteps) > 0 {
+		c.Preboot.Steps = mergedPrebootSteps
+	}
 	if !mainHasSteps && len(mergedSteps) > 0 {
 		c.Steps = mergedSteps
 	}
@@ -109,6 +119,15 @@ func (c *TestConfig) validate() error {
 
 	if len(c.Steps) == 0 {
 		return fmt.Errorf("test config: at least one step is required")
+	}
+
+	for i, step := range c.Preboot.Steps {
+		if step.Action == "" {
+			return fmt.Errorf("test config: preboot.steps[%d] has empty action", i)
+		}
+		if step.Timeout.Duration <= 0 {
+			c.Preboot.Steps[i].Timeout.Duration = 30 * time.Second
+		}
 	}
 
 	for i, step := range c.Steps {

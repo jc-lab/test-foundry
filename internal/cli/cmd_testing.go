@@ -20,6 +20,7 @@ import (
 	"github.com/jc-lab/test-foundry/internal/executor"
 	"github.com/jc-lab/test-foundry/internal/ipc"
 	"github.com/jc-lab/test-foundry/internal/logging"
+	"github.com/jc-lab/test-foundry/internal/preboot"
 	"github.com/jc-lab/test-foundry/internal/qemu"
 	"github.com/jc-lab/test-foundry/internal/workspace"
 )
@@ -97,6 +98,25 @@ func runTest(globals *GlobalFlags, flags *testFlags) error {
 		}
 		logging.Info("Removed test context", "path", testLayout.Root)
 	}()
+
+	if len(testCfg.Preboot.Steps) > 0 {
+		registry := preboot.NewRegistry()
+		actx := &preboot.ActionContext{
+			WorkDir: testLayout.Root,
+			TestDir: filepath.Dir(flags.TestPath),
+		}
+		runner := preboot.NewRunner(registry, actx)
+		result, err := runner.RunSteps(ctx, testCfg.Preboot.Steps)
+		if err != nil {
+			return fmt.Errorf("failed to run test preboot steps: %w", err)
+		}
+		for _, step := range result.Steps {
+			if step.Status == "failed" {
+				return fmt.Errorf("test preboot step failed: %s: %s", step.Action, step.Error)
+			}
+		}
+		logging.Info("All test preboot steps completed successfully")
+	}
 
 	// 3. Create output directory
 	if err := os.MkdirAll(flags.OutputDir, 0755); err != nil {

@@ -11,6 +11,7 @@ It covers VM setup, snapshot creation, test execution, file upload/download, scr
 - QEMU VM setup and snapshot-based test execution
 - Split execution and file-transfer methods for Windows guests (`SSH` / `WinRM`)
 - GitHub workflow-like step-based test definition (`wait-boot`, `exec`, `file-upload`, `file-download`, `screenshot`, `shutdown`, and more)
+- `preboot.steps` support for offline disk patching before boot (`efi-add-file`, etc.)
 - expression support in test step params
   - `${{ test.dir }}`
   - `${{ vmconfig.<json-key> }}`
@@ -82,6 +83,7 @@ Available Commands:
   exec          Execute a command on the guest via SSH
   file-download Download a file from the guest via SFTP
   file-upload   Upload a file to the guest via SFTP
+  poweroff      Forcefully power off the VM
   reboot        Reboot the guest
   screenshot    Capture a screenshot via VNC
   shutdown      Gracefully shut down the guest
@@ -188,6 +190,28 @@ params:
   name: "${{ vmconfig.machine_name }}"
   ssh_port: "${{ vmconfig.ssh_host_port }}"
 ```
+
+## Preboot Steps
+
+`preboot.steps` is used to modify the qcow2 disk offline before QEMU boots. The current built-in preboot action is `efi-add-file`, which writes files into the EFI System Partition FAT32 filesystem.
+
+- `preboot.steps` in image YAML
+- `preboot.steps` in test YAML
+
+Both are supported, so you can patch EFI content either while preparing the base VM or right before an individual test run.
+
+Example:
+
+```yaml
+preboot:
+  steps:
+    - action: efi-add-file
+      params:
+        src: "${{ test.dir }}/bootx64.efi"
+        dst: /EFI/Boot/bootx64.efi
+```
+
+For a full example, see [examples/tests/03-patch-efi/test.yaml](examples/tests/03-patch-efi/test.yaml) and [examples/tests/03-patch-efi/shellx64.efi](examples/tests/03-patch-efi/shellx64.efi). That sample patches EFI boot paths, captures a screenshot, and then powers the VM off.
 
 ## Expressions
 
