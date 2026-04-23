@@ -106,6 +106,7 @@ func TestRunSteps_AllPass(t *testing.T) {
 
 func TestRunSteps_ResolvesExpressionsAtRuntime(t *testing.T) {
 	dir := t.TempDir()
+	t.Setenv("TEST_FOUNDRY_EXPR_SAMPLE", "from-env")
 
 	var gotParams map[string]any
 	mock := &mockAction{
@@ -136,6 +137,7 @@ func TestRunSteps_ResolvesExpressionsAtRuntime(t *testing.T) {
 				"path":     "${{ test.dir }}/artifact.txt",
 				"name":     "${{ vmconfig.machine_name }}",
 				"ssh_port": "${{ vmconfig.ssh_host_port }}",
+				"token":    "${{ env.TEST_FOUNDRY_EXPR_SAMPLE }}",
 			},
 		},
 	}
@@ -157,6 +159,9 @@ func TestRunSteps_ResolvesExpressionsAtRuntime(t *testing.T) {
 	}
 	if gotParams["ssh_port"] != float64(2222) {
 		t.Fatalf("ssh_port = %#v, want 2222", gotParams["ssh_port"])
+	}
+	if gotParams["token"] != "from-env" {
+		t.Fatalf("token = %#v, want from-env", gotParams["token"])
 	}
 }
 

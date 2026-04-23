@@ -87,6 +87,20 @@ func TestResolveParams_TestDir(t *testing.T) {
 	}
 }
 
+func TestResolveParams_Env(t *testing.T) {
+	t.Setenv("TEST_FOUNDRY_PREBOOT_ENV", "preboot-value")
+
+	params, err := ResolveParams(map[string]any{
+		"src": "${{ env.TEST_FOUNDRY_PREBOOT_ENV }}",
+	}, &ActionContext{TestDir: "/tmp/example"})
+	if err != nil {
+		t.Fatalf("ResolveParams failed: %v", err)
+	}
+	if params["src"] != "preboot-value" {
+		t.Fatalf("src = %v, want %q", params["src"], "preboot-value")
+	}
+}
+
 func createTestESPImage(filename string) error {
 	const (
 		diskSize       = int64(64 * 1024 * 1024)

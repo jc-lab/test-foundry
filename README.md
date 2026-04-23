@@ -14,6 +14,7 @@ It covers VM setup, snapshot creation, test execution, file upload/download, scr
 - `preboot.steps` support for offline disk patching before boot (`efi-add-file`, etc.)
 - expression support in test step params
   - `${{ test.dir }}`
+  - `${{ env.<name> }}`
   - `${{ vmconfig.<json-key> }}`
 
 ## Requirements
@@ -225,6 +226,8 @@ Currently supported:
 
 - `${{ test.dir }}`
   - the directory containing the currently running test YAML
+- `${{ env.<name> }}`
+  - access to the current process environment variables
 - `${{ vmconfig.<key> }}`
   - access to runtime `MachineConfig` JSON fields
 
@@ -233,6 +236,7 @@ Examples:
 - `${{ vmconfig.machine_name }}`
 - `${{ vmconfig.qmp_socket_path }}`
 - `${{ vmconfig.ssh_host_port }}`
+- `${{ env.HOME }}`
 
 ## TODO
 

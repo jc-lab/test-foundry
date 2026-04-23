@@ -5,6 +5,7 @@ package action
 
 import (
 	"fmt"
+	"os"
 	"regexp"
 	"strings"
 )
@@ -93,6 +94,12 @@ func evaluateExpression(expr string, actx *ActionContext) (any, error) {
 			return nil, fmt.Errorf("test.dir is not available in this context")
 		}
 		return actx.TestDir, nil
+	case strings.HasPrefix(expr, "env."):
+		key := strings.TrimPrefix(expr, "env.")
+		if key == "" {
+			return nil, fmt.Errorf("env expression requires a variable name")
+		}
+		return os.Getenv(key), nil
 	case strings.HasPrefix(expr, "vmconfig."):
 		vmcfg, err := actx.VMConfig()
 		if err != nil {

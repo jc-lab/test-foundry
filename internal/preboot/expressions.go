@@ -5,6 +5,7 @@ package preboot
 
 import (
 	"fmt"
+	"os"
 	"regexp"
 	"strings"
 )
@@ -87,12 +88,18 @@ func resolveExpressionString(input string, actx *ActionContext) (any, error) {
 }
 
 func evaluateExpression(expr string, actx *ActionContext) (any, error) {
-	switch expr {
-	case "test.dir":
+	switch {
+	case expr == "test.dir":
 		if actx == nil || actx.TestDir == "" {
 			return nil, fmt.Errorf("test.dir is not available in this context")
 		}
 		return actx.TestDir, nil
+	case strings.HasPrefix(expr, "env."):
+		key := strings.TrimPrefix(expr, "env.")
+		if key == "" {
+			return nil, fmt.Errorf("env expression requires a variable name")
+		}
+		return os.Getenv(key), nil
 	default:
 		return nil, fmt.Errorf("unknown expression %q", expr)
 	}
