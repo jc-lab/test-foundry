@@ -242,6 +242,11 @@ Examples:
 
 - Linux guest support
 
+## Documentations
+
+- [docs/image-definition.md](docs/image-definition.md)
+- [docs/test-definition.md](docs/test-definition.md)
+
 ## License
 
 [GPL-2.0-only](LICENSE)
