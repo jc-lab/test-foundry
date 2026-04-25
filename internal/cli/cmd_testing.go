@@ -123,6 +123,12 @@ func runTest(globals *GlobalFlags, flags *testFlags) error {
 		return fmt.Errorf("failed to create output directory: %w", err)
 	}
 
+	actx := &action.ActionContext{
+		WorkDir: testLayout.Root,
+		TestDir: filepath.Dir(flags.TestPath),
+		OutDir:  flags.OutputDir,
+	}
+
 	// Track resources for cleanup
 	var tpmProc *qemu.TPMProcess
 	var machine *qemu.Machine
@@ -160,6 +166,12 @@ func runTest(globals *GlobalFlags, flags *testFlags) error {
 
 	// 5. Build MachineConfig and start QEMU
 	machineCfg := buildMachineConfig(globals, vmCfg, testLayout)
+	serialLog, err := resolveTestSerialLog(testCfg, actx, testLayout)
+	if err != nil {
+		cleanup()
+		return fmt.Errorf("failed to resolve qemu.serial: %w", err)
+	}
+	machineCfg.SerialLog = serialLog
 
 	machine, err = qemu.StartMachine(ctx, machineCfg)
 	if err != nil {
@@ -190,15 +202,10 @@ func runTest(globals *GlobalFlags, flags *testFlags) error {
 		cleanup()
 		return fmt.Errorf("failed to create guest: %w", err)
 	}
+	actx.Machine = machine
+	actx.Guest = guest
 
 	registry := action.NewRegistry()
-	actx := &action.ActionContext{
-		Machine: machine,
-		Guest:   guest,
-		WorkDir: testLayout.Root,
-		TestDir: filepath.Dir(flags.TestPath),
-		OutDir:  flags.OutputDir,
-	}
 
 	// 7. Start IPC server
 	ipcServer, err = ipc.StartServer(ctx, registry, actx)

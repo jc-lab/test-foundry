@@ -541,6 +541,8 @@ steps:
 		dir := t.TempDir()
 		yamlContent := `
 name: expr-test
+qemu:
+  serial: "${{ output.dir }}/serial.log"
 preboot:
   steps:
     - action: efi-add-file
@@ -566,6 +568,9 @@ steps:
 		}
 		if got := cfg.Preboot.Steps[0].Params["src"]; got != "${{ test.dir }}/bootx64.efi" {
 			t.Fatalf("preboot src = %v, want raw expression", got)
+		}
+		if cfg.QEMU.Serial != "${{ output.dir }}/serial.log" {
+			t.Fatalf("qemu.serial = %v, want raw expression", cfg.QEMU.Serial)
 		}
 	})
 
@@ -769,6 +774,38 @@ steps:
 		}
 		if cfg.Panic.Steps[0].Action != "dump" {
 			t.Errorf("Panic.Steps[0].Action = %q, want %q (last include should win)", cfg.Panic.Steps[0].Action, "dump")
+		}
+	})
+
+	t.Run("include_provides_qemu_serial", func(t *testing.T) {
+		dir := t.TempDir()
+
+		includeContent := `
+qemu:
+  serial: "${{ output.dir }}/from-include.log"
+`
+		os.WriteFile(filepath.Join(dir, "include.yaml"), []byte(includeContent), 0644)
+
+		mainContent := `
+name: test-with-qemu-include
+include:
+  - include.yaml
+steps:
+  - action: exec
+    timeout: 10s
+    params:
+      cmd: echo
+`
+		mainFile := filepath.Join(dir, "test.yaml")
+		os.WriteFile(mainFile, []byte(mainContent), 0644)
+
+		cfg, err := LoadTestConfig(mainFile)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		if cfg.QEMU.Serial != "${{ output.dir }}/from-include.log" {
+			t.Fatalf("QEMU.Serial = %q, want include value", cfg.QEMU.Serial)
 		}
 	})
 

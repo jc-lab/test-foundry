@@ -14,12 +14,18 @@ import (
 
 // TestConfig represents the top-level structure of a test definition YAML.
 type TestConfig struct {
-	Name        string      `yaml:"name"`
-	Description string      `yaml:"description"`
-	Include     []string    `yaml:"include"`
-	Preboot     SetupConfig `yaml:"preboot"`
-	Steps       []Step      `yaml:"steps"`
-	Panic       PanicConfig `yaml:"panic"`
+	Name        string         `yaml:"name"`
+	Description string         `yaml:"description"`
+	Include     []string       `yaml:"include"`
+	QEMU        TestQEMUConfig `yaml:"qemu"`
+	Preboot     SetupConfig    `yaml:"preboot"`
+	Steps       []Step         `yaml:"steps"`
+	Panic       PanicConfig    `yaml:"panic"`
+}
+
+// TestQEMUConfig holds test-specific QEMU overrides.
+type TestQEMUConfig struct {
+	Serial string `yaml:"serial,omitempty"`
 }
 
 // PanicConfig holds panic handling configuration.
@@ -67,11 +73,13 @@ func (c *TestConfig) processIncludes(baseDir string) error {
 	mainHasPrebootSteps := len(c.Preboot.Steps) > 0
 	mainHasSteps := len(c.Steps) > 0
 	mainHasPanicSteps := len(c.Panic.Steps) > 0
+	mainHasQEMUSerial := c.QEMU.Serial != ""
 
 	// Merged values from includes (last wins among includes)
 	var mergedPrebootSteps []Step
 	var mergedSteps []Step
 	var mergedPanicSteps []Step
+	var mergedQEMUSerial string
 
 	for _, includePath := range c.Include {
 		fullPath := filepath.Join(baseDir, includePath)
@@ -95,6 +103,9 @@ func (c *TestConfig) processIncludes(baseDir string) error {
 		if len(inc.Panic.Steps) > 0 {
 			mergedPanicSteps = inc.Panic.Steps
 		}
+		if inc.QEMU.Serial != "" {
+			mergedQEMUSerial = inc.QEMU.Serial
+		}
 	}
 
 	// Apply merge: main overrides includes
@@ -106,6 +117,9 @@ func (c *TestConfig) processIncludes(baseDir string) error {
 	}
 	if !mainHasPanicSteps && len(mergedPanicSteps) > 0 {
 		c.Panic.Steps = mergedPanicSteps
+	}
+	if !mainHasQEMUSerial && mergedQEMUSerial != "" {
+		c.QEMU.Serial = mergedQEMUSerial
 	}
 
 	return nil

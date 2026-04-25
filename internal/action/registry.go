@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/jc-lab/test-foundry/internal/expr"
 	"github.com/jc-lab/test-foundry/internal/guest"
 	"github.com/jc-lab/test-foundry/internal/qemu"
 )
@@ -38,6 +39,11 @@ type Action interface {
 
 func (a *ActionContext) VMConfig() (map[string]any, error) {
 	a.vmConfigOnce.Do(func() {
+		if a.Machine == nil || a.Machine.Config == nil {
+			a.vmConfigErr = fmt.Errorf("vm config is not available in this context")
+			return
+		}
+
 		data, err := json.Marshal(a.Machine.Config)
 		if err != nil {
 			a.vmConfigErr = fmt.Errorf("failed to marshal machine config: %w", err)
@@ -51,6 +57,21 @@ func (a *ActionContext) VMConfig() (map[string]any, error) {
 	})
 
 	return a.vmConfig, a.vmConfigErr
+}
+
+// ExprContext creates an expression context for resolving test expressions.
+func (a *ActionContext) ExprContext() *expr.Context {
+	if a == nil {
+		return &expr.Context{}
+	}
+
+	return &expr.Context{
+		TestDir: a.TestDir,
+		OutDir:  a.OutDir,
+		VMConfig: func() (map[string]any, error) {
+			return a.VMConfig()
+		},
+	}
 }
 
 // Registry maintains a map of action name → Action implementation.

@@ -50,6 +50,7 @@ steps:
 | `name` | yes | Human-readable test name. |
 | `description` | no | Free-form description of the test. |
 | `include` | no | List of YAML files to merge into the test definition. |
+| `qemu` | no | Test-specific QEMU overrides such as the serial log path. |
 | `preboot` | no | Offline disk-preparation steps that run before the test boot sequence. |
 | `steps` | yes | Main test steps. At least one step is required. |
 | `panic` | no | Panic-handling steps executed when a guest panic is detected. |
@@ -57,11 +58,12 @@ steps:
 ## Include Files
 
 `include` lets you share common blocks such as panic handlers.
-The loader reads include files in order and merges only these top-level arrays:
+The loader reads include files in order and merges these top-level values:
 
 - `preboot.steps`
 - `steps`
 - `panic.steps`
+- `qemu.serial`
 
 Merge rules:
 
@@ -71,6 +73,16 @@ Merge rules:
 - Nested includes are not processed.
 
 The sample [`examples/tests/common/panic-handler.yaml`](../examples/tests/common/panic-handler.yaml) is a good pattern for shared panic handling.
+
+## QEMU Settings
+
+`qemu.serial` overrides the serial console log path used for the test run. When omitted, the runner
+keeps using the default workspace `serial.log` location.
+
+```yaml
+qemu:
+  serial: "${{ output.dir }}/serial.log"
+```
 
 ## Step Format
 

@@ -6,6 +6,9 @@ package cli
 import (
 	"fmt"
 
+	"github.com/jc-lab/test-foundry/internal/action"
+	"github.com/jc-lab/test-foundry/internal/config"
+	"github.com/jc-lab/test-foundry/internal/expr"
 	"github.com/jc-lab/test-foundry/internal/guest"
 	"github.com/jc-lab/test-foundry/internal/guest/linux"
 	"github.com/jc-lab/test-foundry/internal/guest/windows"
@@ -126,4 +129,30 @@ func buildMachineConfig(globals *GlobalFlags, vmCfg *workspace.VMConfig, layout 
 	}
 
 	return cfg
+}
+
+func resolveTestSerialLog(testCfg *config.TestConfig, actx *action.ActionContext, layout *workspace.Layout) (string, error) {
+	serialLog := layout.SerialLog()
+	if testCfg == nil || testCfg.QEMU.Serial == "" {
+		return serialLog, nil
+	}
+
+	if actx == nil {
+		return "", fmt.Errorf("qemu.serial requires an action context")
+	}
+
+	resolved, err := expr.Resolve(testCfg.QEMU.Serial, actx.ExprContext())
+	if err != nil {
+		return "", err
+	}
+
+	path, ok := resolved.(string)
+	if !ok {
+		return "", fmt.Errorf("qemu.serial must resolve to a string")
+	}
+	if path == "" {
+		return "", fmt.Errorf("qemu.serial resolved to an empty string")
+	}
+
+	return path, nil
 }
