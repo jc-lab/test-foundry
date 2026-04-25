@@ -197,6 +197,7 @@ func runTest(globals *GlobalFlags, flags *testFlags) error {
 		Guest:   guest,
 		WorkDir: testLayout.Root,
 		TestDir: filepath.Dir(flags.TestPath),
+		OutDir:  flags.OutputDir,
 	}
 
 	// 7. Start IPC server

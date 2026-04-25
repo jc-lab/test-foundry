@@ -273,6 +273,7 @@ ${{ ... }}
 In test steps, the following expressions are available:
 
 - `${{ test.dir }}` for the directory containing the current test YAML
+- `${{ output.dir }}` for the directory specified by the `--output` flag.
 - `${{ env.NAME }}` for process environment variables
 - `${{ vmconfig.<path> }}` for runtime VM configuration data
 

@@ -19,6 +19,7 @@ type ActionContext struct {
 	Guest   guest.Guest   // Guest OS 인스턴스 (SSH 통신)
 	WorkDir string        // VM context directory 경로
 	TestDir string        // test YAML directory path
+	OutDir  string        // test output directory
 
 	vmConfigOnce sync.Once
 	vmConfig     map[string]any

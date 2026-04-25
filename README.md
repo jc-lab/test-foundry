@@ -14,6 +14,7 @@ It covers VM setup, snapshot creation, test execution, file upload/download, scr
 - `preboot.steps` support for offline disk patching before boot (`efi-add-file`, etc.)
 - expression support in test step params
   - `${{ test.dir }}`
+  - `${{ output.dir }}`
   - `${{ env.<name> }}`
   - `${{ vmconfig.<json-key> }}`
 

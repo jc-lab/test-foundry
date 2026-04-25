@@ -94,6 +94,8 @@ func evaluateExpression(expr string, actx *ActionContext) (any, error) {
 			return nil, fmt.Errorf("test.dir is not available in this context")
 		}
 		return actx.TestDir, nil
+	case expr == "output.dir":
+		return actx.OutDir, nil
 	case strings.HasPrefix(expr, "env."):
 		key := strings.TrimPrefix(expr, "env.")
 		if key == "" {

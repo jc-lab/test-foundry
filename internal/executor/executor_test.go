@@ -127,6 +127,7 @@ func TestRunSteps_ResolvesExpressionsAtRuntime(t *testing.T) {
 		},
 		WorkDir: dir,
 		TestDir: filepath.Join(dir, "tests"),
+		OutDir:  filepath.Join(dir, "output"),
 	})
 
 	steps := []config.Step{
@@ -135,6 +136,7 @@ func TestRunSteps_ResolvesExpressionsAtRuntime(t *testing.T) {
 			Timeout: config.Duration{Duration: 5 * time.Second},
 			Params: map[string]any{
 				"path":     "${{ test.dir }}/artifact.txt",
+				"result":   "${{ output.dir }}/result.txt",
 				"name":     "${{ vmconfig.machine_name }}",
 				"ssh_port": "${{ vmconfig.ssh_host_port }}",
 				"token":    "${{ env.TEST_FOUNDRY_EXPR_SAMPLE }}",
@@ -153,6 +155,11 @@ func TestRunSteps_ResolvesExpressionsAtRuntime(t *testing.T) {
 	wantPath := filepath.Join(dir, "tests", "artifact.txt")
 	if gotPath != wantPath {
 		t.Fatalf("path = %v, want %v", gotPath, wantPath)
+	}
+	gotResult := filepath.Clean(fmt.Sprint(gotParams["result"]))
+	wantResult := filepath.Join(dir, "output", "result.txt")
+	if gotResult != wantResult {
+		t.Fatalf("result = %v, want %v", gotResult, wantResult)
 	}
 	if gotParams["name"] != "test-vm" {
 		t.Fatalf("name = %v, want test-vm", gotParams["name"])
