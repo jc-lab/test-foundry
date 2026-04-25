@@ -24,13 +24,14 @@ type ImageConfig struct {
 
 // QEMUConfig holds QEMU-specific settings from the image YAML.
 type QEMUConfig struct {
-	Image        string   `yaml:"image"`
-	Firmware     string   `yaml:"firmware"`
-	FirmwareVars string   `yaml:"firmware_vars"`
-	Memory       string   `yaml:"memory"`
-	CPU          string   `yaml:"cpu"`
-	CPUs         int      `yaml:"cpus"`
-	ExtraArgs    []string `yaml:"extra_args"`
+	Image          string   `yaml:"image"`
+	Firmware       string   `yaml:"firmware"`
+	FirmwareVars   string   `yaml:"firmware_vars"`
+	Memory         string   `yaml:"memory"`
+	CPU            string   `yaml:"cpu"`
+	CPUs           int      `yaml:"cpus"`
+	MachineOptions string   `yaml:"machine_options"`
+	ExtraArgs      []string `yaml:"extra_args"`
 }
 
 // ConnectionConfig holds guest connection settings.

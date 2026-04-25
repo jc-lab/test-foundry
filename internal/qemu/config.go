@@ -18,6 +18,7 @@ type MachineConfig struct {
 	Memory         string   `json:"memory"`
 	CPU            string   `json:"cpu"`
 	CPUs           int      `json:"cpus"`
+	MachineOptions string   `json:"machine_options,omitempty"`
 	Headless       bool     `json:"headless"`
 	VNCDisplay     int      `json:"vnc_display"`
 	QMPSocketPath  string   `json:"qmp_socket_path"`
@@ -37,7 +38,11 @@ func (c *MachineConfig) BuildArgs() []string {
 	var args []string
 
 	// 1. Machine type and accelerator
-	args = append(args, "-machine", fmt.Sprintf("q35,accel=%s", detectAccelerator()))
+	machineArg := fmt.Sprintf("q35,accel=%s", detectAccelerator())
+	if c.MachineOptions != "" {
+		machineArg = fmt.Sprintf("%s,%s", machineArg, c.MachineOptions)
+	}
+	args = append(args, "-machine", machineArg)
 
 	// 2. Memory and CPU
 	args = append(args, "-m", c.Memory)
