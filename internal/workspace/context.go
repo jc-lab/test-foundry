@@ -29,12 +29,13 @@ type VMConfig struct {
 	CreatedAt time.Time `json:"created_at"`
 
 	// QEMU settings (copied from image config at vm-setup time)
-	Firmware     string   `json:"firmware,omitempty"`
-	FirmwareVars string   `json:"firmware_vars,omitempty"` // original path; actual file is layout.EFIVars()
-	Memory       string   `json:"memory"`
-	CPU          string   `json:"cpu"`
-	CPUs         int      `json:"cpus"`
-	ExtraArgs    []string `json:"extra_args,omitempty"`
+	Firmware       string   `json:"firmware,omitempty"`
+	FirmwareVars   string   `json:"firmware_vars,omitempty"` // original path; actual file is layout.EFIVars()
+	Memory         string   `json:"memory"`
+	CPU            string   `json:"cpu"`
+	CPUs           int      `json:"cpus"`
+	MachineOptions string   `json:"machine_options,omitempty"`
+	ExtraArgs      []string `json:"extra_args,omitempty"`
 
 	// Feature flags
 	TPM bool `json:"tpm"`

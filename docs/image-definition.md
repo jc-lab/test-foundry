@@ -19,6 +19,7 @@ qemu:
   memory: "4G"
   cpus: 2
   cpu: host
+  machine_options: "aes=off"
   extra_args:
     - "-device"
     - "virtio-tablet-pci"
@@ -67,6 +68,7 @@ continuing.
 | `memory` | no | `2G` | Guest RAM size passed to QEMU. |
 | `cpu` | no | `host` | CPU model passed to QEMU. |
 | `cpus` | no | `2` | Number of virtual CPUs. |
+| `machine_options` | no | - | Extra `-machine` options appended after `q35,accel=...`. |
 | `extra_args` | no | - | Additional raw QEMU arguments. |
 
 ## Connection Settings

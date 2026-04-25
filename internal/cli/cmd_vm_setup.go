@@ -84,12 +84,13 @@ func runVMSetup(globals *GlobalFlags, flags *vmSetupFlags) error {
 		OS:        imgCfg.OS,
 
 		// QEMU settings
-		Firmware:     imgCfg.QEMU.Firmware,
-		FirmwareVars: imgCfg.QEMU.FirmwareVars,
-		Memory:       imgCfg.QEMU.Memory,
-		CPU:          imgCfg.QEMU.CPU,
-		CPUs:         imgCfg.QEMU.CPUs,
-		ExtraArgs:    imgCfg.QEMU.ExtraArgs,
+		Firmware:       imgCfg.QEMU.Firmware,
+		FirmwareVars:   imgCfg.QEMU.FirmwareVars,
+		Memory:         imgCfg.QEMU.Memory,
+		CPU:            imgCfg.QEMU.CPU,
+		CPUs:           imgCfg.QEMU.CPUs,
+		MachineOptions: imgCfg.QEMU.MachineOptions,
+		ExtraArgs:      imgCfg.QEMU.ExtraArgs,
 
 		// Features
 		TPM: flags.TPM,

@@ -82,6 +82,7 @@ description: Test image
 qemu:
   image: ` + imgPath + `
   firmware: /usr/share/OVMF/OVMF_CODE.fd
+  machine_options: aes=off
   memory: 4G
   cpus: 4
 connection:
@@ -120,6 +121,9 @@ setup:
 		}
 		if cfg.QEMU.CPUs != 4 {
 			t.Errorf("QEMU.CPUs = %d, want %d", cfg.QEMU.CPUs, 4)
+		}
+		if cfg.QEMU.MachineOptions != "aes=off" {
+			t.Errorf("QEMU.MachineOptions = %q, want %q", cfg.QEMU.MachineOptions, "aes=off")
 		}
 		if cfg.Connection.Username != "testuser" {
 			t.Errorf("SSH.Username = %q, want %q", cfg.Connection.Username, "testuser")

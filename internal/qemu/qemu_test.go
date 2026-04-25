@@ -13,19 +13,20 @@ import (
 
 func TestBuildArgs_Basic(t *testing.T) {
 	cfg := &MachineConfig{
-		QemuPath:      "/usr/bin/qemu-system-x86_64",
-		MachineName:   "test-vm",
-		OverlayImage:  "/work/overlay.qcow2",
-		Memory:        "4G",
-		CPU:           "host",
-		CPUs:          2,
-		Headless:      true,
-		VNCDisplay:    1,
-		QMPSocketPath: "/work/qmp.sock",
-		QMPPort:       4444,
-		SSHHostPort:   2222,
-		SSHGuestPort:  22,
-		SerialLog:     "/work/serial.log",
+		QemuPath:       "/usr/bin/qemu-system-x86_64",
+		MachineName:    "test-vm",
+		OverlayImage:   "/work/overlay.qcow2",
+		Memory:         "4G",
+		CPU:            "host",
+		CPUs:           2,
+		MachineOptions: "aes=off",
+		Headless:       true,
+		VNCDisplay:     1,
+		QMPSocketPath:  "/work/qmp.sock",
+		QMPPort:        4444,
+		SSHHostPort:    2222,
+		SSHGuestPort:   22,
+		SerialLog:      "/work/serial.log",
 	}
 
 	args := cfg.BuildArgs()
@@ -33,7 +34,7 @@ func TestBuildArgs_Basic(t *testing.T) {
 
 	// Machine type with accelerator
 	expectedAccel := detectAccelerator()
-	assertContainsArg(t, args, "-machine", "q35,accel="+expectedAccel)
+	assertContainsArg(t, args, "-machine", "q35,accel="+expectedAccel+",aes=off")
 
 	// Memory
 	assertContainsArg(t, args, "-m", "4G")
@@ -80,6 +81,20 @@ func TestBuildArgs_Basic(t *testing.T) {
 	if !strings.Contains(argStr, "file:/work/serial.log") {
 		t.Errorf("expected serial log arg, got: %s", argStr)
 	}
+}
+
+func TestBuildArgs_MachineOptions(t *testing.T) {
+	cfg := &MachineConfig{
+		OverlayImage:   "/work/overlay.qcow2",
+		Memory:         "2G",
+		CPUs:           1,
+		MachineOptions: "aes=off,vmport=off",
+		QMPSocketPath:  "/work/qmp.sock",
+		QMPPort:        4444,
+	}
+
+	args := cfg.BuildArgs()
+	assertContainsArg(t, args, "-machine", "q35,accel="+detectAccelerator()+",aes=off,vmport=off")
 }
 
 // --- TestBuildArgs_Headless ---

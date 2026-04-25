@@ -109,6 +109,7 @@ func buildMachineConfig(globals *GlobalFlags, vmCfg *workspace.VMConfig, layout 
 		Memory:         vmCfg.Memory,
 		CPU:            vmCfg.CPU,
 		CPUs:           vmCfg.CPUs,
+		MachineOptions: vmCfg.MachineOptions,
 		Headless:       globals.Headless,
 		VNCDisplay:     vmCfg.VNCDisplay,
 		QMPSocketPath:  layout.QMPSocket(),
