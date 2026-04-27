@@ -3,7 +3,12 @@
 
 package action
 
-import "context"
+import (
+	"context"
+	"fmt"
+
+	"github.com/jc-lab/test-foundry/internal/qemu"
+)
 
 // RebootAction reboots the guest OS and waits for SSH reconnection.
 type RebootAction struct{}
@@ -14,5 +19,13 @@ func (a *RebootAction) Execute(ctx context.Context, actx *ActionContext, params 
 	var p RebootParams
 	_ = DecodeParams(params, &p)
 
-	return actx.Guest.Reboot(ctx)
+	if err := actx.Guest.Reboot(ctx); err != nil {
+		return fmt.Errorf("reboot command: %w", err)
+	}
+
+	if err := qemu.WaitForReset(ctx, actx.Machine); err != nil {
+		return fmt.Errorf("wait-reset: %w", err)
+	}
+
+	return nil
 }

@@ -36,6 +36,7 @@ on the guest OS or QEMU instance.`,
 	cmd.AddCommand(newActionDumpCommand(globals))
 	cmd.AddCommand(newActionSleepCommand(globals))
 	cmd.AddCommand(newActionWaitPanicCommand(globals))
+	cmd.AddCommand(newActionWaitResetCommand(globals))
 
 	return cmd
 }
@@ -409,6 +410,33 @@ func newActionWaitPanicCommand(globals *GlobalFlags) *cobra.Command {
 			return err
 		}
 		_, err = executeWithParams(context.Background(), client, "wait-panic", &action.WaitPanicParams{}, timeout)
+		if err != nil {
+			return fmt.Errorf("wait-panic failed: %w", err)
+		}
+		fmt.Println("Guest panic detected.")
+		return nil
+	}
+
+	return cmd
+}
+
+// newActionWaitResetCommand creates the "action wait-reset" subcommand.
+func newActionWaitResetCommand(globals *GlobalFlags) *cobra.Command {
+	var timeout int
+
+	cmd := &cobra.Command{
+		Use:   "wait-reset",
+		Short: "Wait for a reset event from the guest",
+	}
+
+	cmd.Flags().IntVar(&timeout, "timeout", 300, "Timeout in seconds")
+
+	cmd.RunE = func(cmd *cobra.Command, args []string) error {
+		client, err := createIPCClient(globals)
+		if err != nil {
+			return err
+		}
+		_, err = executeWithParams(context.Background(), client, "wait-reset", &action.WaitResetAction{}, timeout)
 		if err != nil {
 			return fmt.Errorf("wait-panic failed: %w", err)
 		}

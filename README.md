@@ -93,6 +93,7 @@ Available Commands:
   wait-boot     Wait until the guest OS is reachable via SSH
   wait-oobe     Wait until Windows OOBE is completed
   wait-panic    Wait for a pvpanic event from the guest
+  wait-reset    Wait for a reset event from the guest
 
 Flags:
   -h, --help   help for action

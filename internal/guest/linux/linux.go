@@ -120,17 +120,8 @@ func (g *Guest) Reboot(ctx context.Context) error {
 	}
 
 	g.closeTransports()
-	time.Sleep(10 * time.Second)
 
-	timeout := 5 * time.Minute
-	if deadline, ok := ctx.Deadline(); ok {
-		timeout = time.Until(deadline)
-		if timeout <= 0 {
-			return ctx.Err()
-		}
-	}
-
-	return g.WaitBoot(ctx, timeout)
+	return nil
 }
 
 func (g *Guest) closeTransports() {
