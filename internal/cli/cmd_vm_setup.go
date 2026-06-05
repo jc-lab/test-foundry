@@ -210,6 +210,7 @@ func runVMSetup(globals *GlobalFlags, flags *vmSetupFlags) error {
 		Machine: machine,
 		Guest:   guest,
 		WorkDir: layout.Root,
+		TestDir: filepath.Dir(flags.ImagePath),
 	}
 
 	// 6. Start IPC server
