@@ -347,8 +347,7 @@ func (m *Machine) closeListeners() {
 func (m *Machine) Shutdown(ctx context.Context) error {
 	_, err := m.Execute(ctx, "quit", nil)
 	if err != nil {
-		// If QMP fails, try to force kill
-		return m.Kill()
+		return err
 	}
 
 	// Wait for process to exit

@@ -14,5 +14,14 @@ func (a *ShutdownAction) Execute(ctx context.Context, actx *ActionContext, param
 	var p ShutdownParams
 	_ = DecodeParams(params, &p)
 
-	return actx.Guest.Shutdown(ctx)
+	if err := actx.Guest.Shutdown(ctx); err != nil {
+		return err
+	}
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-actx.Machine.Done():
+	}
+	return nil
 }
