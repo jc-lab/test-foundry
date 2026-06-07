@@ -30,7 +30,7 @@ func WaitForPanic(ctx context.Context, machine *Machine) (*PanicEvent, error) {
 			}
 			if event.Event == "GUEST_PANICKED" || event.Event == "GUEST_CRASHLOADED" {
 				logging.Warn("guest panic detected", "event", event.Event)
-				return &PanicEvent{Action: "pause"}, nil
+				return &PanicEvent{Action: ""}, nil
 			}
 			// Ignore non-panic events, continue listening
 		case <-machine.Done():
