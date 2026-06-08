@@ -50,7 +50,7 @@ steps:
 | `name` | yes | Human-readable test name. |
 | `description` | no | Free-form description of the test. |
 | `include` | no | List of YAML files to merge into the test definition. |
-| `qemu` | no | Test-specific QEMU overrides such as the serial log path. |
+| `qemu` | no | Test-specific QEMU overrides. |
 | `preboot` | no | Offline disk-preparation steps that run before the test boot sequence. |
 | `steps` | yes | Main test steps. At least one step is required. |
 | `panic` | no | Panic-handling steps executed when a guest panic is detected. |
@@ -64,6 +64,7 @@ The loader reads include files in order and merges these top-level values:
 - `steps`
 - `panic.steps`
 - `qemu.serial`
+- `qemu.extra_args`
 
 Merge rules:
 
@@ -82,6 +83,17 @@ keeps using the default workspace `serial.log` location.
 ```yaml
 qemu:
   serial: "${{ output.dir }}/serial.log"
+```
+
+`qemu.extra_args` adds additional command-line arguments to the QEMU command.
+
+```yaml
+qemu:
+  extra_args:
+    - "-chardev"
+    - "file,id=debugout,path=${{ output.dir }}/debug.log"
+    - "-device"
+    - "isa-debugcon,iobase=0xe9,chardev=debugout"
 ```
 
 ## Step Format

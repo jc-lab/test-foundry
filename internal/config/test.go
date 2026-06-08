@@ -25,7 +25,8 @@ type TestConfig struct {
 
 // TestQEMUConfig holds test-specific QEMU overrides.
 type TestQEMUConfig struct {
-	Serial string `yaml:"serial,omitempty"`
+	ExtraArgs []string `yaml:"extra_args"`
+	Serial    string   `yaml:"serial,omitempty"`
 }
 
 // PanicConfig holds panic handling configuration.
@@ -80,6 +81,7 @@ func (c *TestConfig) processIncludes(baseDir string) error {
 	var mergedSteps []Step
 	var mergedPanicSteps []Step
 	var mergedQEMUSerial string
+	mergedQEMUExtraArgs := c.QEMU.ExtraArgs
 
 	for _, includePath := range c.Include {
 		fullPath := filepath.Join(baseDir, includePath)
@@ -106,6 +108,9 @@ func (c *TestConfig) processIncludes(baseDir string) error {
 		if inc.QEMU.Serial != "" {
 			mergedQEMUSerial = inc.QEMU.Serial
 		}
+		if len(inc.QEMU.ExtraArgs) > 0 {
+			mergedQEMUExtraArgs = append(mergedQEMUExtraArgs, inc.QEMU.ExtraArgs...)
+		}
 	}
 
 	// Apply merge: main overrides includes
@@ -121,6 +126,7 @@ func (c *TestConfig) processIncludes(baseDir string) error {
 	if !mainHasQEMUSerial && mergedQEMUSerial != "" {
 		c.QEMU.Serial = mergedQEMUSerial
 	}
+	c.QEMU.ExtraArgs = mergedQEMUExtraArgs
 
 	return nil
 }

@@ -157,3 +157,25 @@ func resolveTestSerialLog(testCfg *config.TestConfig, actx *action.ActionContext
 
 	return path, nil
 }
+
+func resolveTestQEMUExtraArgs(testCfg *config.TestConfig, actx *action.ActionContext, layout *workspace.Layout) ([]string, error) {
+	if testCfg == nil || len(testCfg.QEMU.ExtraArgs) == 0 {
+		return nil, nil
+	}
+
+	if actx == nil {
+		return nil, fmt.Errorf("qemu.extra_args requires an action context")
+	}
+
+	resolved, err := expr.Resolve(testCfg.QEMU.ExtraArgs, actx.ExprContext())
+	if err != nil {
+		return nil, err
+	}
+
+	extraArgs, ok := resolved.([]string)
+	if !ok {
+		return nil, fmt.Errorf("qemu.extra_args must resolve to a array")
+	}
+
+	return extraArgs, nil
+}

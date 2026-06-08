@@ -173,6 +173,16 @@ func runTest(globals *GlobalFlags, flags *testFlags) error {
 	}
 	machineCfg.SerialLog = serialLog
 
+	extraArgs, err := resolveTestQEMUExtraArgs(testCfg, actx, testLayout)
+	if err != nil {
+		cleanup()
+		return fmt.Errorf("failed to resolve qemu.extra_args: %w", err)
+	}
+	machineCfg.ExtraArgs = append(
+		machineCfg.ExtraArgs,
+		extraArgs...,
+	)
+
 	machine, err = qemu.StartMachine(ctx, machineCfg)
 	if err != nil {
 		cleanup()

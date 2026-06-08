@@ -25,6 +25,20 @@ func Resolve(value any, ctx *Context) (any, error) {
 	switch v := value.(type) {
 	case string:
 		return resolveString(v, ctx)
+	case []string:
+		out := make([]string, len(v))
+		for i := range v {
+			resolved, err := Resolve(v[i], ctx)
+			if err != nil {
+				return nil, err
+			}
+			v, ok := resolved.(string)
+			if !ok {
+				return nil, fmt.Errorf("expected string, got %T", resolved)
+			}
+			out[i] = v
+		}
+		return out, nil
 	case []any:
 		out := make([]any, len(v))
 		for i := range v {
