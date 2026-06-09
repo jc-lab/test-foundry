@@ -42,7 +42,9 @@ func newTestCommand(globals *GlobalFlags) *cobra.Command {
 		Short: "Run tests against a VM snapshot",
 		Long: `Restore a VM snapshot and execute the test steps defined in the
 test YAML file. Panic events are detected via pvpanic and trigger
-the panic steps for diagnostics collection.`,
+the panic steps for diagnostics collection. The test result file is
+updated after each completed step so you can track progress while the
+run is still in flight.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runTest(globals, flags)
 		},
@@ -122,6 +124,8 @@ func runTest(globals *GlobalFlags, flags *testFlags) error {
 	if err := os.MkdirAll(flags.OutputDir, 0755); err != nil {
 		return fmt.Errorf("failed to create output directory: %w", err)
 	}
+
+	resultPath := filepath.Join(flags.OutputDir, "test-result.json")
 
 	actx := &action.ActionContext{
 		WorkDir: testLayout.Root,
@@ -244,13 +248,29 @@ func runTest(globals *GlobalFlags, flags *testFlags) error {
 		return fmt.Errorf("failed to write vnc.port: %w", err)
 	}
 
+	result := &executor.RunResult{}
+	saveResult := func(resultData *executor.RunResult) error {
+		if resultData == nil {
+			resultData = result
+		}
+
+		data, err := json.MarshalIndent(resultData, "", "  ")
+		if err != nil {
+			return err
+		}
+
+		return os.WriteFile(resultPath, data, 0644)
+	}
+
+	saveResult(result)
+
 	// 8. Start PanicHandler
 	panicHandler := executor.NewPanicHandler(machine)
 	panicHandler.Start(ctx)
 
 	// 9. Run test steps with panic detection
 	runner := executor.NewRunner(registry, actx)
-	result, err := runner.RunSteps(ctx, testCfg.Steps, panicHandler.PanicCh())
+	result, err = runner.RunSteps(ctx, testCfg.Steps, panicHandler.PanicCh(), saveResult)
 	if err != nil {
 		cleanup()
 		return fmt.Errorf("failed to run test steps: %w", err)
@@ -259,21 +279,15 @@ func runTest(globals *GlobalFlags, flags *testFlags) error {
 	// 10. If panic detected, run panic steps
 	if result.PanicDetected && len(testCfg.Panic.Steps) > 0 {
 		logging.Warn("Panic detected, running panic steps")
-		panicResults, panicErr := runner.RunPanicSteps(ctx, testCfg.Panic.Steps)
+		panicResults, panicErr := runner.RunPanicSteps(ctx, result, testCfg.Panic.Steps, saveResult)
 		if panicErr != nil {
 			logging.Warn("Panic steps execution error", "error", panicErr)
 		}
 		result.PanicSteps = panicResults
 	}
 
-	// 11. Write test result to output directory
-	resultPath := filepath.Join(flags.OutputDir, "test-result.json")
-	resultData, err := json.MarshalIndent(result, "", "  ")
-	if err != nil {
-		cleanup()
-		return fmt.Errorf("failed to marshal test result: %w", err)
-	}
-	if err := os.WriteFile(resultPath, resultData, 0644); err != nil {
+	// 11. Write final test result snapshot to output directory
+	if err := saveResult(result); err != nil {
 		cleanup()
 		return fmt.Errorf("failed to write test result: %w", err)
 	}

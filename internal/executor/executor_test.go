@@ -81,7 +81,7 @@ func TestRunSteps_AllPass(t *testing.T) {
 		makeStep("mock-action", 5*time.Second),
 	}
 
-	result, err := runner.RunSteps(context.Background(), steps, nilPanicCh())
+	result, err := runner.RunSteps(context.Background(), steps, nilPanicCh(), nil)
 	if err != nil {
 		t.Fatalf("RunSteps returned error: %v", err)
 	}
@@ -144,7 +144,7 @@ func TestRunSteps_ResolvesExpressionsAtRuntime(t *testing.T) {
 		},
 	}
 
-	result, err := runner.RunSteps(context.Background(), steps, nilPanicCh())
+	result, err := runner.RunSteps(context.Background(), steps, nilPanicCh(), nil)
 	if err != nil {
 		t.Fatalf("RunSteps returned error: %v", err)
 	}
@@ -190,7 +190,7 @@ func TestRunSteps_UnknownExpressionFailsAtRuntime(t *testing.T) {
 		},
 	}
 
-	result, err := runner.RunSteps(context.Background(), steps, nilPanicCh())
+	result, err := runner.RunSteps(context.Background(), steps, nilPanicCh(), nil)
 	if err != nil {
 		t.Fatalf("RunSteps returned error: %v", err)
 	}
@@ -226,7 +226,7 @@ func TestRunSteps_FailureSkipsRemaining(t *testing.T) {
 		makeStep("mock-action", 5*time.Second),
 	}
 
-	result, err := runner.RunSteps(context.Background(), steps, nilPanicCh())
+	result, err := runner.RunSteps(context.Background(), steps, nilPanicCh(), nil)
 	if err != nil {
 		t.Fatalf("RunSteps returned error: %v", err)
 	}
@@ -276,7 +276,7 @@ func TestRunSteps_Timeout(t *testing.T) {
 		makeStep("slow-action", 100*time.Millisecond), // Very short timeout
 	}
 
-	result, err := runner.RunSteps(context.Background(), steps, nilPanicCh())
+	result, err := runner.RunSteps(context.Background(), steps, nilPanicCh(), nil)
 	if err != nil {
 		t.Fatalf("RunSteps returned error: %v", err)
 	}
@@ -326,7 +326,7 @@ func TestRunSteps_PanicDetected(t *testing.T) {
 		panicCh <- struct{}{}
 	}()
 
-	result, err := runner.RunSteps(context.Background(), steps, panicCh)
+	result, err := runner.RunSteps(context.Background(), steps, panicCh, nil)
 	if err != nil {
 		t.Fatalf("RunSteps returned error: %v", err)
 	}
@@ -371,7 +371,7 @@ func TestRunPanicSteps_BestEffort(t *testing.T) {
 		makeStep("panic-step-action", 5*time.Second),
 	}
 
-	results, err := runner.RunPanicSteps(context.Background(), panicSteps)
+	results, err := runner.RunPanicSteps(context.Background(), &RunResult{}, panicSteps, nil)
 	if err != nil {
 		t.Fatalf("RunPanicSteps returned error: %v", err)
 	}
@@ -413,7 +413,7 @@ func TestRunSteps_UnknownAction(t *testing.T) {
 
 	// The first step has an unknown action, so it should fail and skip the rest
 	// But actually we need to use a name that's NOT in the built-in registry
-	result, err := runner.RunSteps(context.Background(), steps, nilPanicCh())
+	result, err := runner.RunSteps(context.Background(), steps, nilPanicCh(), nil)
 	if err != nil {
 		t.Fatalf("RunSteps returned error: %v", err)
 	}

@@ -36,6 +36,9 @@ type Runner struct {
 	actx     *action.ActionContext
 }
 
+// ProgressCallback is called whenever the runner has updated result state.
+type ProgressCallback func(*RunResult) error
+
 // NewRunner creates a new Runner.
 func NewRunner(registry *action.Registry, actx *action.ActionContext) *Runner {
 	return &Runner{
@@ -48,8 +51,13 @@ func NewRunner(registry *action.Registry, actx *action.ActionContext) *Runner {
 // If a step fails, remaining steps are marked as "skipped".
 // If a panic is detected via panicCh, the current step is cancelled,
 // marked as failed with "panic detected", and remaining steps are skipped.
-func (r *Runner) RunSteps(ctx context.Context, steps []config.Step, panicCh <-chan struct{}) (*RunResult, error) {
+func (r *Runner) RunSteps(ctx context.Context, steps []config.Step, panicCh <-chan struct{}, onProgress ProgressCallback) (*RunResult, error) {
 	result := &RunResult{}
+	notifyProgress := func() {
+		if onProgress != nil {
+			onProgress(result)
+		}
+	}
 
 	for i, step := range steps {
 		stepResult := StepResult{
@@ -61,12 +69,14 @@ func (r *Runner) RunSteps(ctx context.Context, steps []config.Step, panicCh <-ch
 			stepResult.Status = "failed"
 			stepResult.Error = fmt.Sprintf("failed to resolve params: %v", err)
 			result.Steps = append(result.Steps, stepResult)
+			notifyProgress()
 			for _, remaining := range steps[i+1:] {
 				result.Steps = append(result.Steps, StepResult{
 					Action: remaining.Action,
 					Status: "skipped",
 					Params: remaining.Params,
 				})
+				notifyProgress()
 			}
 			return result, nil
 		}
@@ -78,6 +88,7 @@ func (r *Runner) RunSteps(ctx context.Context, steps []config.Step, panicCh <-ch
 			stepResult.Status = "failed"
 			stepResult.Error = fmt.Sprintf("unknown action: %s", step.Action)
 			result.Steps = append(result.Steps, stepResult)
+			notifyProgress()
 			// Skip remaining steps
 			for _, remaining := range steps[i+1:] {
 				result.Steps = append(result.Steps, StepResult{
@@ -85,6 +96,7 @@ func (r *Runner) RunSteps(ctx context.Context, steps []config.Step, panicCh <-ch
 					Status: "skipped",
 					Params: remaining.Params,
 				})
+				notifyProgress()
 			}
 			return result, nil
 		}
@@ -134,6 +146,7 @@ func (r *Runner) RunSteps(ctx context.Context, steps []config.Step, panicCh <-ch
 			}
 
 			logging.Error("Step failed", "index", i, "action", step.Action, "duration", duration, "error", stepErr)
+			notifyProgress()
 
 			// Skip remaining steps
 			for _, remaining := range steps[i+1:] {
@@ -142,6 +155,7 @@ func (r *Runner) RunSteps(ctx context.Context, steps []config.Step, panicCh <-ch
 					Status: "skipped",
 					Params: remaining.Params,
 				})
+				notifyProgress()
 			}
 			return result, nil
 		}
@@ -149,6 +163,7 @@ func (r *Runner) RunSteps(ctx context.Context, steps []config.Step, panicCh <-ch
 		stepResult.Status = "passed"
 		result.Steps = append(result.Steps, stepResult)
 		logging.Info("Step passed", "index", i, "action", step.Action, "duration", duration)
+		notifyProgress()
 	}
 
 	return result, nil
@@ -156,8 +171,16 @@ func (r *Runner) RunSteps(ctx context.Context, steps []config.Step, panicCh <-ch
 
 // RunPanicSteps executes the panic steps (for diagnostics after BSOD).
 // Steps are executed best-effort: failures are recorded but do not stop execution.
-func (r *Runner) RunPanicSteps(ctx context.Context, steps []config.Step) ([]StepResult, error) {
+func (r *Runner) RunPanicSteps(ctx context.Context, result *RunResult, steps []config.Step, onProgress ProgressCallback) ([]StepResult, error) {
 	var results []StepResult
+	notifyProgress := func() {
+		if result != nil {
+			result.PanicSteps = results
+		}
+		if onProgress != nil {
+			onProgress(result)
+		}
+	}
 
 	for i, step := range steps {
 		stepResult := StepResult{
@@ -169,6 +192,7 @@ func (r *Runner) RunPanicSteps(ctx context.Context, steps []config.Step) ([]Step
 			stepResult.Status = "failed"
 			stepResult.Error = fmt.Sprintf("failed to resolve params: %v", err)
 			results = append(results, stepResult)
+			notifyProgress()
 			continue
 		}
 		stepResult.Params = resolvedParams
@@ -178,6 +202,7 @@ func (r *Runner) RunPanicSteps(ctx context.Context, steps []config.Step) ([]Step
 			stepResult.Status = "failed"
 			stepResult.Error = fmt.Sprintf("unknown action: %s", step.Action)
 			results = append(results, stepResult)
+			notifyProgress()
 			continue
 		}
 
@@ -202,6 +227,7 @@ func (r *Runner) RunPanicSteps(ctx context.Context, steps []config.Step) ([]Step
 		}
 
 		results = append(results, stepResult)
+		notifyProgress()
 	}
 
 	return results, nil

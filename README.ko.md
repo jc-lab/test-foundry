@@ -152,6 +152,7 @@ test-foundry --vm-name="win11" test --output ./temp --test ./examples/tests/01-h
 이 명령에서:
 
 - `--output ./temp` 는 `test-result.json` 저장 위치입니다.
+- `test-result.json` 은 각 step 이 끝날 때마다 갱신되므로, 실행 중인 상태도 확인할 수 있습니다.
 - 예제 테스트 자체는 [examples/tests/01-hello-world/test.yaml](examples/tests/01-hello-world/test.yaml) 안에서 결과 파일 경로를 `./output/01/...` 로 정의하고 있습니다.
 
 즉, 실행 후 산출물은 두 군데로 나뉩니다.

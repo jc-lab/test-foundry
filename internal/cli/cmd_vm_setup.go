@@ -242,7 +242,7 @@ func runVMSetup(globals *GlobalFlags, flags *vmSetupFlags) error {
 
 	// 8. Run setup steps
 	runner := executor.NewRunner(registry, actx)
-	result, err := runner.RunSteps(ctx, imgCfg.Setup.Steps, nil)
+	result, err := runner.RunSteps(ctx, imgCfg.Setup.Steps, nil, nil)
 	if err != nil {
 		cleanup()
 		return fmt.Errorf("failed to run setup steps: %w", err)

@@ -151,6 +151,7 @@ test-foundry --vm-name="win11" test --output ./temp --test ./examples/tests/01-h
 In this command:
 
 - `--output ./temp` is the location for `test-result.json`
+- `test-result.json` is updated after each completed step, so you can inspect in-flight progress
 - the sample test itself writes output files to `./output/01/...` as defined in [examples/tests/01-hello-world/test.yaml](examples/tests/01-hello-world/test.yaml)
 
 So after the run, artifacts are split across two locations:
