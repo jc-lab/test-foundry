@@ -94,6 +94,7 @@ func NewRegistry() *Registry {
 	r.Register(&ShutdownAction{})
 	r.Register(&PoweroffAction{})
 	r.Register(&RebootAction{})
+	r.Register(&ResumeAction{})
 	r.Register(&WaitResetAction{})
 	r.Register(&DumpAction{})
 	r.Register(&SleepAction{})

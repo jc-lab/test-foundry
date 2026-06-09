@@ -87,6 +87,7 @@ Available Commands:
   file-upload   Upload a file to the guest via SFTP
   poweroff      Forcefully power off the VM
   reboot        Reboot the guest
+  resume        Resume a paused VM
   screenshot    Capture a screenshot via VNC
   shutdown      Gracefully shut down the guest
   sleep         Wait for a specified duration
@@ -184,6 +185,10 @@ The sample [examples/tests/01-hello-world/test.yaml](examples/tests/01-hello-wor
 4. `file-download`
 5. `screenshot`
 6. `shutdown`
+
+When pvpanic is detected during a test run, test-foundry pauses the VM first. You can then use
+`action resume` to continue it, or `poweroff` in `panic.steps` if you want the panic workflow to
+terminate the VM explicitly after collecting artifacts.
 
 Test parameters can also use expressions:
 

@@ -92,6 +92,10 @@ type ShutdownParams struct{}
 // Currently empty but defined for future extensibility.
 type RebootParams struct{}
 
+// ResumeParams holds parameters for the resume action.
+// Currently empty but defined for future extensibility.
+type ResumeParams struct{}
+
 // DumpParams holds parameters for the dump action.
 type DumpParams struct {
 	// Format

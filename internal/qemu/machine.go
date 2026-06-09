@@ -364,3 +364,9 @@ func (m *Machine) Pause(ctx context.Context) error {
 	_, err := m.Execute(ctx, "stop", nil)
 	return err
 }
+
+// Resume sends the QMP cont command to resume a paused VM.
+func (m *Machine) Resume(ctx context.Context) error {
+	_, err := m.Execute(ctx, "cont", nil)
+	return err
+}

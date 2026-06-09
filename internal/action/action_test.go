@@ -87,6 +87,7 @@ func TestNewRegistry(t *testing.T) {
 		"shutdown",
 		"poweroff",
 		"reboot",
+		"resume",
 		"wait-reset",
 		"dump",
 		"sleep",
@@ -189,6 +190,15 @@ func TestSleepAction(t *testing.T) {
 
 func TestPoweroffAction(t *testing.T) {
 	action := &PoweroffAction{}
+
+	err := action.Execute(context.Background(), &ActionContext{}, nil)
+	if err == nil {
+		t.Fatal("expected error when machine is missing")
+	}
+}
+
+func TestResumeAction(t *testing.T) {
+	action := &ResumeAction{}
 
 	err := action.Execute(context.Background(), &ActionContext{}, nil)
 	if err == nil {

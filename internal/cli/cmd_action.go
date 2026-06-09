@@ -33,6 +33,7 @@ on the guest OS or QEMU instance.`,
 	cmd.AddCommand(newActionShutdownCommand(globals))
 	cmd.AddCommand(newActionPoweroffCommand(globals))
 	cmd.AddCommand(newActionRebootCommand(globals))
+	cmd.AddCommand(newActionResumeCommand(globals))
 	cmd.AddCommand(newActionDumpCommand(globals))
 	cmd.AddCommand(newActionSleepCommand(globals))
 	cmd.AddCommand(newActionWaitPanicCommand(globals))
@@ -329,6 +330,33 @@ func newActionRebootCommand(globals *GlobalFlags) *cobra.Command {
 			return fmt.Errorf("reboot failed: %w", err)
 		}
 		fmt.Println("Guest reboot initiated.")
+		return nil
+	}
+
+	return cmd
+}
+
+// newActionResumeCommand creates the "action resume" subcommand.
+func newActionResumeCommand(globals *GlobalFlags) *cobra.Command {
+	var timeout int
+
+	cmd := &cobra.Command{
+		Use:   "resume",
+		Short: "Resume a paused VM",
+	}
+
+	cmd.Flags().IntVar(&timeout, "timeout", 30, "Timeout in seconds")
+
+	cmd.RunE = func(cmd *cobra.Command, args []string) error {
+		client, err := createIPCClient(globals)
+		if err != nil {
+			return err
+		}
+		_, err = executeWithParams(context.Background(), client, "resume", &action.ResumeParams{}, timeout)
+		if err != nil {
+			return fmt.Errorf("resume failed: %w", err)
+		}
+		fmt.Println("VM resumed.")
 		return nil
 	}
 

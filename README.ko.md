@@ -86,6 +86,7 @@ Available Commands:
   file-upload   Upload a file to the guest via SFTP
   poweroff      Forcefully power off the VM
   reboot        Reboot the guest
+  resume        Resume a paused VM
   screenshot    Capture a screenshot via VNC
   shutdown      Gracefully shut down the guest
   sleep         Wait for a specified duration
@@ -185,6 +186,8 @@ https://github.com/user-attachments/assets/df809996-ffa4-41ff-853d-884219c2b46c
 4. `file-download`
 5. `screenshot`
 6. `shutdown`
+
+테스트 실행 중 pvpanic이 감지되면 test-foundry는 먼저 VM을 pause 합니다. 이후 `action resume`으로 다시 실행을 이어갈 수 있고, panic 처리 단계에서 수집 후 명시적으로 종료하고 싶다면 기존 `poweroff` action을 사용할 수 있습니다.
 
 또한 테스트 파라미터에서는 expression을 사용할 수 있습니다.
 

@@ -30,7 +30,7 @@ func WaitForPanic(ctx context.Context, machine *Machine) (*PanicEvent, error) {
 			}
 			if event.Event == "GUEST_PANICKED" || event.Event == "GUEST_CRASHLOADED" {
 				logging.Warn("guest panic detected", "event", event.Event)
-				return &PanicEvent{Action: ""}, nil
+				return &PanicEvent{Action: "pause"}, nil
 			}
 			// Ignore non-panic events, continue listening
 		case <-machine.Done():
@@ -50,6 +50,8 @@ func HandlePanicEvent(ctx context.Context, machine *Machine, event *PanicEvent) 
 		return nil
 	case "pause":
 		return machine.Pause(ctx)
+	case "resume":
+		return machine.Resume(ctx)
 	default:
 		return fmt.Errorf("unsupported panic action %q", event.Action)
 	}

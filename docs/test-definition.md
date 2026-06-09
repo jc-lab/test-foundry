@@ -200,6 +200,12 @@ Forces the VM process to exit.
 
 This action does not require params.
 
+### `resume`
+
+Resumes a VM that was paused through QMP.
+
+This action does not require params.
+
 ### `reboot`
 
 Reboots the guest and waits for it to come back.
@@ -269,7 +275,9 @@ Preboot expressions support:
 ## Panic Handling
 
 `panic.steps` runs when the guest triggers pvpanic and the test runner detects a crash.
-This is a good place to take screenshots or capture memory dumps.
+When pvpanic is detected, test-foundry first pauses the VM through QMP. This is a good place
+to take screenshots or capture memory dumps. If you want to continue execution after collecting
+artifacts, add `resume`. If you want to force termination, use the existing `poweroff` action.
 
 ```yaml
 panic:
@@ -284,6 +292,9 @@ panic:
       params:
         format: "win-dmp"
         output: "./output/02/memory.dump"
+
+    - action: resume
+      timeout: 30s
 ```
 
 ## Expressions
