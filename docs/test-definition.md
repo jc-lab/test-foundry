@@ -101,7 +101,9 @@ qemu:
 Every step uses the same base shape:
 
 ```yaml
-- action: exec
+- id: query_service
+  name: "Query mydriver service"
+  action: exec
   timeout: 30s
   params:
     cmd: "sc"
@@ -110,6 +112,8 @@ Every step uses the same base shape:
 
 | Field | Required | Description |
 | --- | --- | --- |
+| `id` | no | Step identifier used to reference outputs in later steps. Defaults to `step_<1-based index>` if omitted. Must be unique within a step list. |
+| `name` | no | Human-readable display name for the step. |
 | `action` | yes | Action name. |
 | `timeout` | yes | Maximum duration for the step. It must be a valid duration for `steps`, `panic.steps`, and any other runtime step list. |
 | `params` | no | Action-specific parameters. |
@@ -179,6 +183,26 @@ params:
 | `cmd` | yes | Command to execute. |
 | `args` | no | Command arguments. |
 | `expect_exit_code` | no | If set, the action fails unless the command exits with this code. |
+
+#### Step Outputs
+
+`exec` captures up to 4 KB of stdout. Later steps can read it via `${{ steps.<id>.outputs.stdout }}`, where `<id>` is the step's `id` (or the auto-assigned `step_<N>`).
+
+```yaml
+steps:
+  - id: get_version
+    action: exec
+    timeout: 10s
+    params:
+      cmd: "myapp"
+      args: ["--version"]
+
+  - action: exec
+    timeout: 10s
+    params:
+      cmd: "echo"
+      args: ["version was: ${{ steps.get_version.outputs.stdout }}"]
+```
 
 ### `screenshot`
 
@@ -315,6 +339,7 @@ In test steps, the following expressions are available:
 - `${{ output.dir }}` for the directory specified by the `--output` flag.
 - `${{ env.NAME }}` for process environment variables
 - `${{ vmconfig.<path> }}` for runtime VM configuration data
+- `${{ steps.<id>.outputs.stdout }}` for the stdout captured from a previously completed `exec` step
 
 Expressions can be used inside a full string or embedded in a larger string.
 

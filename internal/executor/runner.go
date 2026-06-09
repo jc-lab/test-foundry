@@ -16,6 +16,8 @@ import (
 
 // StepResult holds the result of a single step execution.
 type StepResult struct {
+	ID         string         `json:"id"`
+	Name       string         `json:"name,omitempty"`
 	Action     string         `json:"action"`
 	Status     string         `json:"status"` // "passed", "failed", "skipped"
 	DurationMs int64          `json:"duration_ms"`
@@ -60,7 +62,13 @@ func (r *Runner) RunSteps(ctx context.Context, steps []config.Step, panicCh <-ch
 	}
 
 	for i, step := range steps {
+		stepID := step.ID
+		if stepID == "" {
+			stepID = fmt.Sprintf("step_%d", i+1)
+		}
 		stepResult := StepResult{
+			ID:     stepID,
+			Name:   step.Name,
 			Action: step.Action,
 		}
 
@@ -70,8 +78,14 @@ func (r *Runner) RunSteps(ctx context.Context, steps []config.Step, panicCh <-ch
 			stepResult.Error = fmt.Sprintf("failed to resolve params: %v", err)
 			result.Steps = append(result.Steps, stepResult)
 			notifyProgress()
-			for _, remaining := range steps[i+1:] {
+			for j, remaining := range steps[i+1:] {
+				rid := remaining.ID
+				if rid == "" {
+					rid = fmt.Sprintf("step_%d", i+2+j)
+				}
 				result.Steps = append(result.Steps, StepResult{
+					ID:     rid,
+					Name:   remaining.Name,
 					Action: remaining.Action,
 					Status: "skipped",
 					Params: remaining.Params,
@@ -90,8 +104,14 @@ func (r *Runner) RunSteps(ctx context.Context, steps []config.Step, panicCh <-ch
 			result.Steps = append(result.Steps, stepResult)
 			notifyProgress()
 			// Skip remaining steps
-			for _, remaining := range steps[i+1:] {
+			for j, remaining := range steps[i+1:] {
+				rid := remaining.ID
+				if rid == "" {
+					rid = fmt.Sprintf("step_%d", i+2+j)
+				}
 				result.Steps = append(result.Steps, StepResult{
+					ID:     rid,
+					Name:   remaining.Name,
 					Action: remaining.Action,
 					Status: "skipped",
 					Params: remaining.Params,
@@ -101,17 +121,19 @@ func (r *Runner) RunSteps(ctx context.Context, steps []config.Step, panicCh <-ch
 			return result, nil
 		}
 
+		sctx := action.NewStepContext(r.actx)
+
 		// Create a timeout context for this step
 		stepCtx, stepCancel := context.WithTimeout(ctx, step.Timeout.Duration)
 
-		logging.Info("Executing step", "index", i, "action", step.Action, "timeout", step.Timeout.Duration)
+		logging.Info("Executing step", "index", i, "id", stepID, "name", step.Name, "action", step.Action, "timeout", step.Timeout.Duration)
 
 		startTime := time.Now()
 
 		// Execute the action in a goroutine so we can also listen for panic
 		doneCh := make(chan error, 1)
 		go func() {
-			doneCh <- act.Execute(stepCtx, r.actx, resolvedParams)
+			doneCh <- act.Execute(stepCtx, sctx, resolvedParams)
 		}()
 
 		var stepErr error
@@ -146,6 +168,11 @@ func (r *Runner) RunSteps(ctx context.Context, steps []config.Step, panicCh <-ch
 
 		stepCancel()
 
+		if r.actx.StepOutputs == nil {
+			r.actx.StepOutputs = make(map[string]map[string]string)
+		}
+		r.actx.StepOutputs[stepID] = sctx.Outputs()
+
 		if stepErr != nil {
 			stepResult.Status = "failed"
 			stepResult.Error = stepErr.Error()
@@ -155,12 +182,18 @@ func (r *Runner) RunSteps(ctx context.Context, steps []config.Step, panicCh <-ch
 				result.PanicDetected = true
 			}
 
-			logging.Error("Step failed", "index", i, "action", step.Action, "duration", duration, "error", stepErr)
+			logging.Error("Step failed", "index", i, "id", stepID, "name", step.Name, "action", step.Action, "duration", duration, "error", stepErr)
 			notifyProgress()
 
 			// Skip remaining steps
-			for _, remaining := range steps[i+1:] {
+			for j, remaining := range steps[i+1:] {
+				rid := remaining.ID
+				if rid == "" {
+					rid = fmt.Sprintf("step_%d", i+2+j)
+				}
 				result.Steps = append(result.Steps, StepResult{
+					ID:     rid,
+					Name:   remaining.Name,
 					Action: remaining.Action,
 					Status: "skipped",
 					Params: remaining.Params,
@@ -172,7 +205,7 @@ func (r *Runner) RunSteps(ctx context.Context, steps []config.Step, panicCh <-ch
 
 		stepResult.Status = "passed"
 		result.Steps = append(result.Steps, stepResult)
-		logging.Info("Step passed", "index", i, "action", step.Action, "duration", duration)
+		logging.Info("Step passed", "index", i, "id", stepID, "name", step.Name, "action", step.Action, "duration", duration)
 		notifyProgress()
 	}
 
@@ -193,7 +226,13 @@ func (r *Runner) RunPanicSteps(ctx context.Context, result *RunResult, steps []c
 	}
 
 	for i, step := range steps {
+		stepID := step.ID
+		if stepID == "" {
+			stepID = fmt.Sprintf("step_%d", i+1)
+		}
 		stepResult := StepResult{
+			ID:     stepID,
+			Name:   step.Name,
 			Action: step.Action,
 		}
 
@@ -216,24 +255,31 @@ func (r *Runner) RunPanicSteps(ctx context.Context, result *RunResult, steps []c
 			continue
 		}
 
+		sctx := action.NewStepContext(r.actx)
+
 		stepCtx, stepCancel := context.WithTimeout(ctx, step.Timeout.Duration)
 
-		logging.Info("Executing panic step", "index", i, "action", step.Action, "timeout", step.Timeout.Duration)
+		logging.Info("Executing panic step", "index", i, "id", stepID, "name", step.Name, "action", step.Action, "timeout", step.Timeout.Duration)
 
 		startTime := time.Now()
-		err = act.Execute(stepCtx, r.actx, resolvedParams)
+		err = act.Execute(stepCtx, sctx, resolvedParams)
 		duration := time.Since(startTime)
 		stepCancel()
+
+		if r.actx.StepOutputs == nil {
+			r.actx.StepOutputs = make(map[string]map[string]string)
+		}
+		r.actx.StepOutputs[stepID] = sctx.Outputs()
 
 		stepResult.DurationMs = duration.Milliseconds()
 
 		if err != nil {
 			stepResult.Status = "failed"
 			stepResult.Error = err.Error()
-			logging.Error("Panic step failed", "index", i, "action", step.Action, "duration", duration, "error", err)
+			logging.Error("Panic step failed", "index", i, "id", stepID, "name", step.Name, "action", step.Action, "duration", duration, "error", err)
 		} else {
 			stepResult.Status = "passed"
-			logging.Info("Panic step passed", "index", i, "action", step.Action, "duration", duration)
+			logging.Info("Panic step passed", "index", i, "id", stepID, "name", step.Name, "action", step.Action, "duration", duration)
 		}
 
 		results = append(results, stepResult)

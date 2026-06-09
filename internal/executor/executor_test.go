@@ -19,14 +19,14 @@ import (
 
 type mockAction struct {
 	name   string
-	execFn func(ctx context.Context, actx *action.ActionContext, params map[string]any) error
+	execFn func(ctx context.Context, sctx *action.StepContext, params map[string]any) error
 }
 
 func (m *mockAction) Name() string { return m.name }
 
-func (m *mockAction) Execute(ctx context.Context, actx *action.ActionContext, params map[string]any) error {
+func (m *mockAction) Execute(ctx context.Context, sctx *action.StepContext, params map[string]any) error {
 	if m.execFn != nil {
-		return m.execFn(ctx, actx, params)
+		return m.execFn(ctx, sctx, params)
 	}
 	return nil
 }
@@ -66,7 +66,7 @@ func TestRunSteps_AllPass(t *testing.T) {
 	callCount := 0
 	mock := &mockAction{
 		name: "mock-action",
-		execFn: func(ctx context.Context, actx *action.ActionContext, params map[string]any) error {
+		execFn: func(ctx context.Context, sctx *action.StepContext, params map[string]any) error {
 			callCount++
 			return nil
 		},
@@ -111,7 +111,7 @@ func TestRunSteps_ResolvesExpressionsAtRuntime(t *testing.T) {
 	var gotParams map[string]any
 	mock := &mockAction{
 		name: "mock-action",
-		execFn: func(ctx context.Context, actx *action.ActionContext, params map[string]any) error {
+		execFn: func(ctx context.Context, sctx *action.StepContext, params map[string]any) error {
 			gotParams = params
 			return nil
 		},
@@ -208,7 +208,7 @@ func TestRunSteps_FailureSkipsRemaining(t *testing.T) {
 	callCount := 0
 	mock := &mockAction{
 		name: "mock-action",
-		execFn: func(ctx context.Context, actx *action.ActionContext, params map[string]any) error {
+		execFn: func(ctx context.Context, sctx *action.StepContext, params map[string]any) error {
 			callCount++
 			if callCount == 2 {
 				return fmt.Errorf("intentional failure on step 2")
@@ -259,7 +259,7 @@ func TestRunSteps_FailureSkipsRemaining(t *testing.T) {
 func TestRunSteps_Timeout(t *testing.T) {
 	mock := &mockAction{
 		name: "slow-action",
-		execFn: func(ctx context.Context, actx *action.ActionContext, params map[string]any) error {
+		execFn: func(ctx context.Context, sctx *action.StepContext, params map[string]any) error {
 			select {
 			case <-time.After(10 * time.Second):
 				return nil
@@ -301,7 +301,7 @@ func TestRunSteps_PanicDetected(t *testing.T) {
 
 	mock := &mockAction{
 		name: "waiting-action",
-		execFn: func(ctx context.Context, actx *action.ActionContext, params map[string]any) error {
+		execFn: func(ctx context.Context, sctx *action.StepContext, params map[string]any) error {
 			// Simulate work, but will be interrupted by panic
 			select {
 			case <-time.After(10 * time.Second):
@@ -352,7 +352,7 @@ func TestRunSteps_PanicDetectedAfterDoneChFailureWaitsForDelay(t *testing.T) {
 
 	mock := &mockAction{
 		name: "failing-action",
-		execFn: func(ctx context.Context, actx *action.ActionContext, params map[string]any) error {
+		execFn: func(ctx context.Context, sctx *action.StepContext, params map[string]any) error {
 			return fmt.Errorf("intentional failure")
 		},
 	}
@@ -400,7 +400,7 @@ func TestRunPanicSteps_BestEffort(t *testing.T) {
 	callCount := 0
 	mock := &mockAction{
 		name: "panic-step-action",
-		execFn: func(ctx context.Context, actx *action.ActionContext, params map[string]any) error {
+		execFn: func(ctx context.Context, sctx *action.StepContext, params map[string]any) error {
 			callCount++
 			if callCount == 1 {
 				return fmt.Errorf("first panic step failed")

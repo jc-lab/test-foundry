@@ -13,7 +13,7 @@ type FileDownloadAction struct{}
 
 func (a *FileDownloadAction) Name() string { return "file-download" }
 
-func (a *FileDownloadAction) Execute(ctx context.Context, actx *ActionContext, params map[string]any) error {
+func (a *FileDownloadAction) Execute(ctx context.Context, sctx *StepContext, params map[string]any) error {
 	var p FileDownloadParams
 	if err := DecodeParams(params, &p); err != nil {
 		return fmt.Errorf("file-download: %w", err)
@@ -23,5 +23,5 @@ func (a *FileDownloadAction) Execute(ctx context.Context, actx *ActionContext, p
 		return fmt.Errorf("file-download: 'src' and 'dst' params are required")
 	}
 
-	return actx.Guest.FileTransport().Download(ctx, p.Src, p.Dst)
+	return sctx.Guest.FileTransport().Download(ctx, p.Src, p.Dst)
 }

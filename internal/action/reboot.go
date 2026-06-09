@@ -15,15 +15,15 @@ type RebootAction struct{}
 
 func (a *RebootAction) Name() string { return "reboot" }
 
-func (a *RebootAction) Execute(ctx context.Context, actx *ActionContext, params map[string]any) error {
+func (a *RebootAction) Execute(ctx context.Context, sctx *StepContext, params map[string]any) error {
 	var p RebootParams
 	_ = DecodeParams(params, &p)
 
-	if err := actx.Guest.Reboot(ctx); err != nil {
+	if err := sctx.Guest.Reboot(ctx); err != nil {
 		return fmt.Errorf("reboot command: %w", err)
 	}
 
-	if err := qemu.WaitForReset(ctx, actx.Machine); err != nil {
+	if err := qemu.WaitForReset(ctx, sctx.Machine); err != nil {
 		return fmt.Errorf("wait-reset: %w", err)
 	}
 

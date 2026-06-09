@@ -14,7 +14,7 @@ type SleepAction struct{}
 
 func (a *SleepAction) Name() string { return "sleep" }
 
-func (a *SleepAction) Execute(ctx context.Context, actx *ActionContext, params map[string]any) error {
+func (a *SleepAction) Execute(ctx context.Context, sctx *StepContext, params map[string]any) error {
 	var p SleepParams
 	if err := DecodeParams(params, &p); err != nil {
 		return fmt.Errorf("sleep: %w", err)

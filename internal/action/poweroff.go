@@ -13,9 +13,9 @@ type PoweroffAction struct{}
 
 func (a *PoweroffAction) Name() string { return "poweroff" }
 
-func (a *PoweroffAction) Execute(ctx context.Context, actx *ActionContext, params map[string]any) error {
-	if actx == nil || actx.Machine == nil {
+func (a *PoweroffAction) Execute(ctx context.Context, sctx *StepContext, params map[string]any) error {
+	if sctx == nil || sctx.Machine == nil {
 		return fmt.Errorf("poweroff: machine is not available")
 	}
-	return actx.Machine.Kill()
+	return sctx.Machine.Kill()
 }

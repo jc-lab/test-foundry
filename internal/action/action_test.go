@@ -109,7 +109,7 @@ func TestNewRegistry(t *testing.T) {
 
 func TestWaitResetAction_WithMockGuest(t *testing.T) {
 	action := &WaitResetAction{}
-	err := action.Execute(context.Background(), &ActionContext{}, map[string]any{
+	err := action.Execute(context.Background(), NewStepContext(&ActionContext{}), map[string]any{
 		"retry_interval": "1ms",
 	})
 	if err == nil {
@@ -136,7 +136,7 @@ func TestSleepAction(t *testing.T) {
 		ctx := context.Background()
 
 		start := time.Now()
-		err := action.Execute(ctx, &ActionContext{}, map[string]any{
+		err := action.Execute(ctx, NewStepContext(&ActionContext{}), map[string]any{
 			"duration": "100ms",
 		})
 		elapsed := time.Since(start)
@@ -157,7 +157,7 @@ func TestSleepAction(t *testing.T) {
 		action := &SleepAction{}
 		ctx := context.Background()
 
-		err := action.Execute(ctx, &ActionContext{}, map[string]any{
+		err := action.Execute(ctx, NewStepContext(&ActionContext{}), map[string]any{
 			"duration": "notaduration",
 		})
 		if err == nil {
@@ -169,7 +169,7 @@ func TestSleepAction(t *testing.T) {
 		action := &SleepAction{}
 		ctx := context.Background()
 
-		err := action.Execute(ctx, &ActionContext{}, map[string]any{})
+		err := action.Execute(ctx, NewStepContext(&ActionContext{}), map[string]any{})
 		if err == nil {
 			t.Fatal("expected error for missing duration param")
 		}
@@ -180,7 +180,7 @@ func TestSleepAction(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 		defer cancel()
 
-		err := action.Execute(ctx, &ActionContext{}, map[string]any{
+		err := action.Execute(ctx, NewStepContext(&ActionContext{}), map[string]any{
 			"duration": "10s",
 		})
 		if err == nil {
@@ -192,7 +192,7 @@ func TestSleepAction(t *testing.T) {
 func TestPoweroffAction(t *testing.T) {
 	action := &PoweroffAction{}
 
-	err := action.Execute(context.Background(), &ActionContext{}, nil)
+	err := action.Execute(context.Background(), NewStepContext(&ActionContext{}), nil)
 	if err == nil {
 		t.Fatal("expected error when machine is missing")
 	}
@@ -201,7 +201,7 @@ func TestPoweroffAction(t *testing.T) {
 func TestResumeAction(t *testing.T) {
 	action := &ResumeAction{}
 
-	err := action.Execute(context.Background(), &ActionContext{}, nil)
+	err := action.Execute(context.Background(), NewStepContext(&ActionContext{}), nil)
 	if err == nil {
 		t.Fatal("expected error when machine is missing")
 	}
@@ -229,7 +229,7 @@ func TestFileUploadAction_MissingParams(t *testing.T) {
 			if params == nil {
 				params = map[string]any{}
 			}
-			err := action.Execute(ctx, &ActionContext{}, params)
+			err := action.Execute(ctx, NewStepContext(&ActionContext{}), params)
 			if err == nil {
 				t.Fatal("expected error for missing params")
 			}
@@ -254,7 +254,7 @@ func TestFileDownloadAction_MissingParams(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := action.Execute(ctx, &ActionContext{}, tt.params)
+			err := action.Execute(ctx, NewStepContext(&ActionContext{}), tt.params)
 			if err == nil {
 				t.Fatal("expected error for missing params")
 			}
@@ -268,7 +268,7 @@ func TestExecAction_MissingCmd(t *testing.T) {
 	action := &ExecAction{}
 	ctx := context.Background()
 
-	err := action.Execute(ctx, &ActionContext{}, map[string]any{})
+	err := action.Execute(ctx, NewStepContext(&ActionContext{}), map[string]any{})
 	if err == nil {
 		t.Fatal("expected error for missing cmd param")
 	}
@@ -284,9 +284,9 @@ func TestExecAction_WithMockGuest(t *testing.T) {
 
 		action := &ExecAction{}
 		ctx := context.Background()
-		actx := &ActionContext{Guest: mg}
+		sctx := NewStepContext(&ActionContext{Guest: mg})
 
-		err := action.Execute(ctx, actx, map[string]any{
+		err := action.Execute(ctx, sctx, map[string]any{
 			"cmd":  "echo",
 			"args": []interface{}{"hello"},
 		})
@@ -304,9 +304,9 @@ func TestExecAction_WithMockGuest(t *testing.T) {
 
 		action := &ExecAction{}
 		ctx := context.Background()
-		actx := &ActionContext{Guest: mg}
+		sctx := NewStepContext(&ActionContext{Guest: mg})
 
-		err := action.Execute(ctx, actx, map[string]any{
+		err := action.Execute(ctx, sctx, map[string]any{
 			"cmd":              "test",
 			"expect_exit_code": 0,
 		})
@@ -324,9 +324,9 @@ func TestExecAction_WithMockGuest(t *testing.T) {
 
 		action := &ExecAction{}
 		ctx := context.Background()
-		actx := &ActionContext{Guest: mg}
+		sctx := NewStepContext(&ActionContext{Guest: mg})
 
-		err := action.Execute(ctx, actx, map[string]any{
+		err := action.Execute(ctx, sctx, map[string]any{
 			"cmd":              "failing-cmd",
 			"expect_exit_code": 0,
 		})
@@ -345,9 +345,9 @@ func TestExecAction_WithMockGuest(t *testing.T) {
 
 		action := &ExecAction{}
 		ctx := context.Background()
-		actx := &ActionContext{Guest: mg}
+		sctx := NewStepContext(&ActionContext{Guest: mg})
 
-		err := action.Execute(ctx, actx, map[string]any{
+		err := action.Execute(ctx, sctx, map[string]any{
 			"cmd":              "test",
 			"expect_exit_code": float64(0),
 		})
@@ -365,9 +365,9 @@ func TestExecAction_WithMockGuest(t *testing.T) {
 
 		action := &ExecAction{}
 		ctx := context.Background()
-		actx := &ActionContext{Guest: mg}
+		sctx := NewStepContext(&ActionContext{Guest: mg})
 
-		err := action.Execute(ctx, actx, map[string]any{
+		err := action.Execute(ctx, sctx, map[string]any{
 			"cmd": "echo",
 		})
 		if err == nil {
@@ -382,7 +382,7 @@ func TestDumpAction_MissingOutput(t *testing.T) {
 	action := &DumpAction{}
 	ctx := context.Background()
 
-	err := action.Execute(ctx, &ActionContext{}, map[string]any{})
+	err := action.Execute(ctx, NewStepContext(&ActionContext{}), map[string]any{})
 	if err == nil {
 		t.Fatal("expected error for missing output param")
 	}
@@ -394,7 +394,7 @@ func TestScreenshotAction_MissingOutput(t *testing.T) {
 	action := &ScreenshotAction{}
 	ctx := context.Background()
 
-	err := action.Execute(ctx, &ActionContext{}, map[string]any{})
+	err := action.Execute(ctx, NewStepContext(&ActionContext{}), map[string]any{})
 	if err == nil {
 		t.Fatal("expected error for missing output param")
 	}

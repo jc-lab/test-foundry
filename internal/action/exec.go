@@ -7,9 +7,12 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 
 	"github.com/jc-lab/test-foundry/internal/logging"
 )
+
+const execStdoutMaxSize = 4 * 1024
 
 // lineWriter buffers writes and logs each complete line with a fixed prefix.
 type lineWriter struct {
@@ -33,7 +36,6 @@ func (w *lineWriter) Write(p []byte) (n int, err error) {
 	return len(p), nil
 }
 
-// flush logs any remaining buffered content that had no trailing newline.
 func (w *lineWriter) flush() {
 	if len(w.buf) > 0 {
 		logging.Info(w.prefix + ": " + string(w.buf))
@@ -41,12 +43,30 @@ func (w *lineWriter) flush() {
 	}
 }
 
+// captureWriter accumulates up to max bytes and silently discards the rest.
+type captureWriter struct {
+	buf []byte
+	max int
+}
+
+func (w *captureWriter) Write(p []byte) (int, error) {
+	if rem := w.max - len(w.buf); rem > 0 {
+		if len(p) > rem {
+			p = p[:rem]
+		}
+		w.buf = append(w.buf, p...)
+	}
+	return len(p), nil
+}
+
+func (w *captureWriter) String() string { return string(w.buf) }
+
 // ExecAction executes a command on the guest via SSH.
 type ExecAction struct{}
 
 func (a *ExecAction) Name() string { return "exec" }
 
-func (a *ExecAction) Execute(ctx context.Context, actx *ActionContext, params map[string]any) error {
+func (a *ExecAction) Execute(ctx context.Context, sctx *StepContext, params map[string]any) error {
 	var p ExecParams
 	if err := DecodeParams(params, &p); err != nil {
 		return fmt.Errorf("exec: %w", err)
@@ -56,11 +76,17 @@ func (a *ExecAction) Execute(ctx context.Context, actx *ActionContext, params ma
 		return fmt.Errorf("exec: 'cmd' param is required")
 	}
 
+	capture := &captureWriter{max: execStdoutMaxSize}
 	stdoutW := &lineWriter{prefix: "stdout"}
 	stderrW := &lineWriter{prefix: "stderr"}
-	result, err := actx.Guest.Exec(ctx, stdoutW, stderrW, p.Cmd, p.Args...)
+	stdout := io.MultiWriter(stdoutW, capture)
+
+	result, err := sctx.Guest.Exec(ctx, stdout, stderrW, p.Cmd, p.Args...)
 	stdoutW.flush()
 	stderrW.flush()
+
+	sctx.SetOutput("stdout", capture.String())
+
 	if err != nil {
 		return fmt.Errorf("exec: command execution failed: %w", err)
 	}

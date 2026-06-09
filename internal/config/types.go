@@ -7,6 +7,8 @@ import "time"
 
 // Step represents a single step in a setup or test sequence.
 type Step struct {
+	ID      string         `yaml:"id"`      // Step identifier for referencing outputs; defaults to step_<1-based index>
+	Name    string         `yaml:"name"`    // Human-readable display name
 	Action  string         `yaml:"action"`  // Action 이름 (예: "wait-boot", "file-upload", "exec")
 	Timeout Duration       `yaml:"timeout"` // Step 실행 제한 시간
 	Params  map[string]any `yaml:"params"`  // Action별 파라미터 (action마다 다른 구조)

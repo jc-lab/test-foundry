@@ -202,7 +202,7 @@ func (s *Server) handleAction(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Execute the action
-	execErr := act.Execute(ctx, s.actx, req.Params)
+	execErr := act.Execute(ctx, action.NewStepContext(s.actx), req.Params)
 
 	// For screenshot: return PNG binary
 	if actionName == "screenshot" && execErr == nil {

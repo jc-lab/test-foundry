@@ -24,6 +24,9 @@ type ActionContext struct {
 	OutDir  string        // test output directory
 	Panic   *config.PanicConfig
 
+	// StepOutputs holds captured outputs for completed steps, keyed by step ID.
+	StepOutputs map[string]map[string]string
+
 	vmConfigOnce sync.Once
 	vmConfig     map[string]any
 	vmConfigErr  error
@@ -36,7 +39,7 @@ type Action interface {
 
 	// Execute performs the action with the given parameters.
 	// params는 YAML의 step.params에서 전달된 map.
-	Execute(ctx context.Context, actx *ActionContext, params map[string]any) error
+	Execute(ctx context.Context, sctx *StepContext, params map[string]any) error
 }
 
 func (a *ActionContext) VMConfig() (map[string]any, error) {
@@ -72,6 +75,9 @@ func (a *ActionContext) ExprContext() *expr.Context {
 		OutDir:  a.OutDir,
 		VMConfig: func() (map[string]any, error) {
 			return a.VMConfig()
+		},
+		Steps: func() map[string]map[string]string {
+			return a.StepOutputs
 		},
 	}
 }

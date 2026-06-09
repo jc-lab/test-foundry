@@ -14,7 +14,7 @@ type WaitBootAction struct{}
 
 func (a *WaitBootAction) Name() string { return "wait-boot" }
 
-func (a *WaitBootAction) Execute(ctx context.Context, actx *ActionContext, params map[string]any) error {
+func (a *WaitBootAction) Execute(ctx context.Context, sctx *StepContext, params map[string]any) error {
 	var p WaitBootParams
 	if err := DecodeParams(params, &p); err != nil {
 		return fmt.Errorf("wait-boot: %w", err)
@@ -34,5 +34,5 @@ func (a *WaitBootAction) Execute(ctx context.Context, actx *ActionContext, param
 	}
 	timeout := time.Until(deadline)
 
-	return actx.Guest.WaitBoot(ctx, timeout)
+	return sctx.Guest.WaitBoot(ctx, timeout)
 }

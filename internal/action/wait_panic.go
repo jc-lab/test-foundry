@@ -14,10 +14,10 @@ type WaitPanicAction struct{}
 
 func (a *WaitPanicAction) Name() string { return "wait-panic" }
 
-func (a *WaitPanicAction) Execute(ctx context.Context, actx *ActionContext, params map[string]any) error {
+func (a *WaitPanicAction) Execute(ctx context.Context, sctx *StepContext, params map[string]any) error {
 	var p WaitPanicParams
 	_ = DecodeParams(params, &p)
 
-	_, err := qemu.WaitForPanic(ctx, actx.Machine)
+	_, err := qemu.WaitForPanic(ctx, sctx.Machine)
 	return err
 }

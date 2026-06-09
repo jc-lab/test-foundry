@@ -13,7 +13,7 @@ type WaitOOBEAction struct{}
 
 func (a *WaitOOBEAction) Name() string { return "wait-oobe" }
 
-func (a *WaitOOBEAction) Execute(ctx context.Context, actx *ActionContext, params map[string]any) error {
+func (a *WaitOOBEAction) Execute(ctx context.Context, sctx *StepContext, params map[string]any) error {
 	var p WaitOOBEParams
 	_ = DecodeParams(params, &p)
 
@@ -23,5 +23,5 @@ func (a *WaitOOBEAction) Execute(ctx context.Context, actx *ActionContext, param
 	}
 	timeout := time.Until(deadline)
 
-	return actx.Guest.WaitReady(ctx, timeout)
+	return sctx.Guest.WaitReady(ctx, timeout)
 }

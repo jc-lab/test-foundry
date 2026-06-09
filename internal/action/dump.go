@@ -15,7 +15,7 @@ type DumpAction struct{}
 
 func (a *DumpAction) Name() string { return "dump" }
 
-func (a *DumpAction) Execute(ctx context.Context, actx *ActionContext, params map[string]any) error {
+func (a *DumpAction) Execute(ctx context.Context, sctx *StepContext, params map[string]any) error {
 	var p DumpParams
 	if err := DecodeParams(params, &p); err != nil {
 		return fmt.Errorf("dump: %w", err)
@@ -33,13 +33,13 @@ func (a *DumpAction) Execute(ctx context.Context, actx *ActionContext, params ma
 		args["format"] = p.Format
 	}
 
-	resp, err := actx.Machine.Execute(ctx, "dump-guest-memory", args)
+	resp, err := sctx.Machine.Execute(ctx, "dump-guest-memory", args)
 	if err != nil {
 		return fmt.Errorf("dump: QMP dump-guest-memory failed: %w", err)
 	}
 	_ = resp
 
-	if err := qemu.WaitForDumpCompletion(ctx, actx.Machine); err != nil {
+	if err := qemu.WaitForDumpCompletion(ctx, sctx.Machine); err != nil {
 		return fmt.Errorf("dump: waiting for DUMP_COMPLETED failed: %w", err)
 	}
 

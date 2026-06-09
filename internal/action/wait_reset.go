@@ -15,11 +15,11 @@ type WaitResetAction struct{}
 
 func (a *WaitResetAction) Name() string { return "wait-reset" }
 
-func (a *WaitResetAction) Execute(ctx context.Context, actx *ActionContext, params map[string]any) error {
-	if actx.Machine == nil {
+func (a *WaitResetAction) Execute(ctx context.Context, sctx *StepContext, params map[string]any) error {
+	if sctx.Machine == nil {
 		return fmt.Errorf("wait-reset: machine is required")
 	}
-	if err := qemu.WaitForReset(ctx, actx.Machine); err != nil {
+	if err := qemu.WaitForReset(ctx, sctx.Machine); err != nil {
 		return fmt.Errorf("wait-reset: %w", err)
 	}
 	return nil

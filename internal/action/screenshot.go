@@ -16,7 +16,7 @@ type ScreenshotAction struct{}
 
 func (a *ScreenshotAction) Name() string { return "screenshot" }
 
-func (a *ScreenshotAction) Execute(ctx context.Context, actx *ActionContext, params map[string]any) error {
+func (a *ScreenshotAction) Execute(ctx context.Context, sctx *StepContext, params map[string]any) error {
 	var p ScreenshotParams
 	if err := DecodeParams(params, &p); err != nil {
 		return fmt.Errorf("screenshot: %w", err)
@@ -26,6 +26,6 @@ func (a *ScreenshotAction) Execute(ctx context.Context, actx *ActionContext, par
 		return fmt.Errorf("screenshot: 'output' param is required")
 	}
 
-	vncPort := qemu.VNCPort(actx.Machine.Config.VNCDisplay)
+	vncPort := qemu.VNCPort(sctx.Machine.Config.VNCDisplay)
 	return vnc.SaveScreenshotPNG(ctx, "127.0.0.1", vncPort, p.Output)
 }

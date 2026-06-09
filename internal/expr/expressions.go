@@ -18,6 +18,8 @@ type Context struct {
 	TestDir  string
 	OutDir   string
 	VMConfig func() (map[string]any, error)
+	// Steps returns a map of stepID → outputName → value for ${{ steps.ID.outputs.NAME }} expressions.
+	Steps func() map[string]map[string]string
 }
 
 // Resolve recursively resolves expression strings inside the provided value.
@@ -138,6 +140,21 @@ func evaluate(expr string, ctx *Context) (any, error) {
 			return nil, err
 		}
 		return lookupPath(vmcfg, strings.TrimPrefix(expr, "vmconfig."))
+	case strings.HasPrefix(expr, "steps."):
+		// steps.STEP_ID.outputs.OUTPUT_NAME
+		if ctx == nil || ctx.Steps == nil {
+			return nil, fmt.Errorf("steps is not available in this context")
+		}
+		parts := strings.SplitN(strings.TrimPrefix(expr, "steps."), ".", 3)
+		if len(parts) != 3 || parts[1] != "outputs" {
+			return nil, fmt.Errorf("invalid steps expression %q: expected steps.<id>.outputs.<name>", expr)
+		}
+		stepID, outputName := parts[0], parts[2]
+		outputs, ok := ctx.Steps()[stepID]
+		if !ok {
+			return "", nil
+		}
+		return outputs[outputName], nil
 	default:
 		return nil, fmt.Errorf("unknown expression %q", expr)
 	}

@@ -10,18 +10,18 @@ type ShutdownAction struct{}
 
 func (a *ShutdownAction) Name() string { return "shutdown" }
 
-func (a *ShutdownAction) Execute(ctx context.Context, actx *ActionContext, params map[string]any) error {
+func (a *ShutdownAction) Execute(ctx context.Context, sctx *StepContext, params map[string]any) error {
 	var p ShutdownParams
 	_ = DecodeParams(params, &p)
 
-	if err := actx.Guest.Shutdown(ctx); err != nil {
+	if err := sctx.Guest.Shutdown(ctx); err != nil {
 		return err
 	}
 
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
-	case <-actx.Machine.Done():
+	case <-sctx.Machine.Done():
 	}
 	return nil
 }
