@@ -347,6 +347,53 @@ func TestRunSteps_PanicDetected(t *testing.T) {
 	}
 }
 
+func TestRunSteps_PanicDetectedAfterDoneChFailureWaitsForDelay(t *testing.T) {
+	panicCh := make(chan struct{}, 1)
+
+	mock := &mockAction{
+		name: "failing-action",
+		execFn: func(ctx context.Context, actx *action.ActionContext, params map[string]any) error {
+			return fmt.Errorf("intentional failure")
+		},
+	}
+
+	registry := newMockRegistry(mock)
+	runner := NewRunner(registry, &action.ActionContext{})
+	delay := 150 * time.Millisecond
+
+	steps := []config.Step{
+		makeStep("failing-action", 5*time.Second),
+	}
+
+	go func() {
+		time.Sleep(50 * time.Millisecond)
+		panicCh <- struct{}{}
+	}()
+
+	start := time.Now()
+	runner.actx.Panic = &config.PanicConfig{
+		ActionDelay: &delay,
+	}
+	result, err := runner.RunSteps(context.Background(), steps, panicCh, nil)
+	elapsed := time.Since(start)
+	if err != nil {
+		t.Fatalf("RunSteps returned error: %v", err)
+	}
+
+	if !result.PanicDetected {
+		t.Fatal("expected PanicDetected to be true")
+	}
+	if len(result.Steps) != 1 {
+		t.Fatalf("expected 1 step result, got %d", len(result.Steps))
+	}
+	if result.Steps[0].Error != "panic detected" {
+		t.Fatalf("step error = %q, want panic detected", result.Steps[0].Error)
+	}
+	if elapsed < 40*time.Millisecond {
+		t.Fatalf("runner returned too quickly: %v", elapsed)
+	}
+}
+
 // --- TestRunPanicSteps_BestEffort ---
 
 func TestRunPanicSteps_BestEffort(t *testing.T) {

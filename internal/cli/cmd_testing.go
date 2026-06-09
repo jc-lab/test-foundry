@@ -131,6 +131,7 @@ func runTest(globals *GlobalFlags, flags *testFlags) error {
 		WorkDir: testLayout.Root,
 		TestDir: filepath.Dir(flags.TestPath),
 		OutDir:  flags.OutputDir,
+		Panic:   &testCfg.Panic,
 	}
 
 	// Track resources for cleanup

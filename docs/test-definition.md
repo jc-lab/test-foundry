@@ -279,8 +279,12 @@ When pvpanic is detected, test-foundry first pauses the VM through QMP. This is 
 to take screenshots or capture memory dumps. If you want to continue execution after collecting
 artifacts, add `resume`. If you want to force termination, use the existing `poweroff` action.
 
+If `panic.action_delay` is set, the runner waits that long after a step already failed before
+it finalizes the failure, giving `panicCh` a short grace period to arrive.
+
 ```yaml
 panic:
+  action_delay: 2s
   steps:
     - action: screenshot
       timeout: 10s

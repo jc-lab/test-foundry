@@ -119,7 +119,17 @@ func (r *Runner) RunSteps(ctx context.Context, steps []config.Step, panicCh <-ch
 
 		select {
 		case stepErr = <-doneCh:
-			// Step completed (success or failure)
+			// Step completed (success or failure).
+			if stepErr != nil {
+				if delay := panicActionDelay(r.actx); delay > 0 && panicCh != nil {
+					select {
+					case <-panicCh:
+						panicDetected = true
+						stepErr = fmt.Errorf("panic detected")
+					case <-time.After(delay):
+					}
+				}
+			}
 		case _ = <-panicCh:
 			// Panic detected — cancel the current step
 			stepCancel()
@@ -231,4 +241,14 @@ func (r *Runner) RunPanicSteps(ctx context.Context, result *RunResult, steps []c
 	}
 
 	return results, nil
+}
+
+func panicActionDelay(actx *action.ActionContext) time.Duration {
+	if actx == nil || actx.Panic == nil || actx.Panic.ActionDelay == nil {
+		return 0
+	}
+	if *actx.Panic.ActionDelay <= 0 {
+		return 0
+	}
+	return *actx.Panic.ActionDelay
 }

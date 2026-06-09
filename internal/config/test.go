@@ -31,7 +31,8 @@ type TestQEMUConfig struct {
 
 // PanicConfig holds panic handling configuration.
 type PanicConfig struct {
-	Steps []Step `yaml:"steps"`
+	ActionDelay *time.Duration `yaml:"action_delay"`
+	Steps       []Step         `yaml:"steps"`
 }
 
 // LoadTestConfig reads and parses a test definition YAML file, processing includes.

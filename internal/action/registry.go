@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/jc-lab/test-foundry/internal/config"
 	"github.com/jc-lab/test-foundry/internal/expr"
 	"github.com/jc-lab/test-foundry/internal/guest"
 	"github.com/jc-lab/test-foundry/internal/qemu"
@@ -21,6 +22,7 @@ type ActionContext struct {
 	WorkDir string        // VM context directory 경로
 	TestDir string        // test YAML directory path
 	OutDir  string        // test output directory
+	Panic   *config.PanicConfig
 
 	vmConfigOnce sync.Once
 	vmConfig     map[string]any

@@ -435,6 +435,8 @@ func TestLoadTestConfig(t *testing.T) {
 		yamlContent := `
 name: basic-test
 description: A basic test
+panic:
+  action_delay: 2s
 steps:
   - action: wait-boot
     timeout: 120s
@@ -463,6 +465,9 @@ steps:
 		}
 		if cfg.Steps[0].Timeout.Duration != 120*time.Second {
 			t.Errorf("Steps[0].Timeout = %v, want 120s", cfg.Steps[0].Timeout.Duration)
+		}
+		if cfg.Panic.ActionDelay == nil || *cfg.Panic.ActionDelay != 2*time.Second {
+			t.Fatalf("Panic.ActionDelay = %v, want 2s", cfg.Panic.ActionDelay)
 		}
 	})
 
