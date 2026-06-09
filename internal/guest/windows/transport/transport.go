@@ -4,7 +4,10 @@
 // Package transport defines the abstraction for guest OS communication transports (SSH, WinRM).
 package transport
 
-import "context"
+import (
+	"context"
+	"io"
+)
 
 // ExecResult holds the result of a command execution on the guest.
 type ExecResult struct {
@@ -32,8 +35,8 @@ type Connector interface {
 type CommandTransport interface {
 	Connector
 
-	// RunCommand executes a command on the guest.
-	RunCommand(ctx context.Context, cmd string) (stdout, stderr string, exitCode int, err error)
+	// RunCommand executes a command on the guest, streaming output to stdout/stderr.
+	RunCommand(ctx context.Context, stdout, stderr io.Writer, cmd string) (exitCode int, err error)
 }
 
 // FileTransport defines the transport surface used for file transfers.

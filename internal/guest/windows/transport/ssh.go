@@ -120,12 +120,12 @@ func (t *SSHTransport) IsConnected() bool {
 	return err == nil
 }
 
-func (t *SSHTransport) RunCommand(ctx context.Context, cmd string) (stdout, stderr string, exitCode int, err error) {
+func (t *SSHTransport) RunCommand(ctx context.Context, stdout, stderr io.Writer, cmd string) (exitCode int, err error) {
 	t.mu.Lock()
 	if t.client == nil {
 		t.mu.Unlock()
 		if connErr := t.Connect(ctx); connErr != nil {
-			return "", "", -1, fmt.Errorf("failed to connect: %w", connErr)
+			return -1, fmt.Errorf("failed to connect: %w", connErr)
 		}
 		t.mu.Lock()
 	}
@@ -134,17 +134,17 @@ func (t *SSHTransport) RunCommand(ctx context.Context, cmd string) (stdout, stde
 
 	session, err := client.NewSession()
 	if err != nil {
-		return "", "", -1, fmt.Errorf("failed to create SSH session: %w", err)
+		return -1, fmt.Errorf("failed to create SSH session: %w", err)
 	}
 	defer session.Close()
 
 	stdoutPipe, err := session.StdoutPipe()
 	if err != nil {
-		return "", "", -1, fmt.Errorf("failed to create stdout pipe: %w", err)
+		return -1, fmt.Errorf("failed to create stdout pipe: %w", err)
 	}
 	stderrPipe, err := session.StderrPipe()
 	if err != nil {
-		return "", "", -1, fmt.Errorf("failed to create stderr pipe: %w", err)
+		return -1, fmt.Errorf("failed to create stderr pipe: %w", err)
 	}
 
 	done := make(chan struct{})
@@ -159,11 +159,14 @@ func (t *SSHTransport) RunCommand(ctx context.Context, cmd string) (stdout, stde
 	}()
 
 	if err := session.Start(cmd); err != nil {
-		return "", "", -1, fmt.Errorf("failed to start command: %w", err)
+		return -1, fmt.Errorf("failed to start command: %w", err)
 	}
 
-	stdoutBytes, _ := io.ReadAll(stdoutPipe)
-	stderrBytes, _ := io.ReadAll(stderrPipe)
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() { defer wg.Done(); io.Copy(stdout, stdoutPipe) }()
+	go func() { defer wg.Done(); io.Copy(stderr, stderrPipe) }()
+	wg.Wait()
 
 	exitCode = 0
 	if err := session.Wait(); err != nil {
@@ -171,13 +174,13 @@ func (t *SSHTransport) RunCommand(ctx context.Context, cmd string) (stdout, stde
 			exitCode = exitErr.ExitStatus()
 		} else {
 			if ctx.Err() != nil {
-				return string(stdoutBytes), string(stderrBytes), -1, ctx.Err()
+				return -1, ctx.Err()
 			}
-			return string(stdoutBytes), string(stderrBytes), -1, fmt.Errorf("command execution failed: %w", err)
+			return -1, fmt.Errorf("command execution failed: %w", err)
 		}
 	}
 
-	return string(stdoutBytes), string(stderrBytes), exitCode, nil
+	return exitCode, nil
 }
 
 func (t *SSHTransport) ensureSFTP() error {

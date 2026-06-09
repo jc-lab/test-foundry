@@ -5,6 +5,7 @@ package guest
 
 import (
 	"context"
+	"io"
 	"time"
 
 	"github.com/jc-lab/test-foundry/internal/guest/windows/transport"
@@ -12,9 +13,7 @@ import (
 
 // ExecResult holds the result of a command execution on the guest.
 type ExecResult struct {
-	ExitCode int    // 프로세스 종료 코드
-	Stdout   string // 표준 출력
-	Stderr   string // 표준 에러
+	ExitCode int // 프로세스 종료 코드
 }
 
 // Guest defines the interface for interacting with a guest OS.
@@ -34,7 +33,7 @@ type Guest interface {
 	WaitReady(ctx context.Context, timeout time.Duration) error
 
 	// Exec runs a command on the guest and returns the result.
-	Exec(ctx context.Context, cmd string, args ...string) (*ExecResult, error)
+	Exec(ctx context.Context, stdout, stderr io.Writer, cmd string, args ...string) (*ExecResult, error)
 
 	// Shutdown gracefully shuts down the guest OS.
 	Shutdown(ctx context.Context) error

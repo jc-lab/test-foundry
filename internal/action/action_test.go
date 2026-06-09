@@ -6,6 +6,7 @@ package action
 import (
 	"context"
 	"fmt"
+	"io"
 	"testing"
 	"time"
 
@@ -24,7 +25,7 @@ type mockGuest struct {
 	mockFileTransport
 	waitBootFn func(ctx context.Context, timeout time.Duration) error
 	rebootFn   func(ctx context.Context) error
-	execFn     func(ctx context.Context, cmd string, args ...string) (*guest.ExecResult, error)
+	execFn     func(ctx context.Context, stdout, stderr io.Writer, cmd string, args ...string) (*guest.ExecResult, error)
 }
 
 func (m *mockFileTransport) Upload(ctx context.Context, localPath, remotePath string) error {
@@ -56,9 +57,9 @@ func (m *mockGuest) WaitReady(ctx context.Context, timeout time.Duration) error 
 	return nil
 }
 
-func (m *mockGuest) Exec(ctx context.Context, cmd string, args ...string) (*guest.ExecResult, error) {
+func (m *mockGuest) Exec(ctx context.Context, stdout, stderr io.Writer, cmd string, args ...string) (*guest.ExecResult, error) {
 	if m.execFn != nil {
-		return m.execFn(ctx, cmd, args...)
+		return m.execFn(ctx, stdout, stderr, cmd, args...)
 	}
 	return &guest.ExecResult{ExitCode: 0}, nil
 }
@@ -276,11 +277,8 @@ func TestExecAction_MissingCmd(t *testing.T) {
 func TestExecAction_WithMockGuest(t *testing.T) {
 	t.Run("success_default_exit_code", func(t *testing.T) {
 		mg := &mockGuest{
-			execFn: func(ctx context.Context, cmd string, args ...string) (*guest.ExecResult, error) {
-				return &guest.ExecResult{
-					ExitCode: 0,
-					Stdout:   "hello",
-				}, nil
+			execFn: func(ctx context.Context, stdout, stderr io.Writer, cmd string, args ...string) (*guest.ExecResult, error) {
+				return &guest.ExecResult{ExitCode: 0}, nil
 			},
 		}
 
@@ -299,7 +297,7 @@ func TestExecAction_WithMockGuest(t *testing.T) {
 
 	t.Run("expect_exit_code_match", func(t *testing.T) {
 		mg := &mockGuest{
-			execFn: func(ctx context.Context, cmd string, args ...string) (*guest.ExecResult, error) {
+			execFn: func(ctx context.Context, stdout, stderr io.Writer, cmd string, args ...string) (*guest.ExecResult, error) {
 				return &guest.ExecResult{ExitCode: 0}, nil
 			},
 		}
@@ -319,11 +317,8 @@ func TestExecAction_WithMockGuest(t *testing.T) {
 
 	t.Run("expect_exit_code_mismatch", func(t *testing.T) {
 		mg := &mockGuest{
-			execFn: func(ctx context.Context, cmd string, args ...string) (*guest.ExecResult, error) {
-				return &guest.ExecResult{
-					ExitCode: 1,
-					Stderr:   "command failed",
-				}, nil
+			execFn: func(ctx context.Context, stdout, stderr io.Writer, cmd string, args ...string) (*guest.ExecResult, error) {
+				return &guest.ExecResult{ExitCode: 1}, nil
 			},
 		}
 
@@ -343,7 +338,7 @@ func TestExecAction_WithMockGuest(t *testing.T) {
 	t.Run("expect_exit_code_float64", func(t *testing.T) {
 		// YAML/JSON numbers are often decoded as float64
 		mg := &mockGuest{
-			execFn: func(ctx context.Context, cmd string, args ...string) (*guest.ExecResult, error) {
+			execFn: func(ctx context.Context, stdout, stderr io.Writer, cmd string, args ...string) (*guest.ExecResult, error) {
 				return &guest.ExecResult{ExitCode: 0}, nil
 			},
 		}
@@ -363,7 +358,7 @@ func TestExecAction_WithMockGuest(t *testing.T) {
 
 	t.Run("exec_guest_error", func(t *testing.T) {
 		mg := &mockGuest{
-			execFn: func(ctx context.Context, cmd string, args ...string) (*guest.ExecResult, error) {
+			execFn: func(ctx context.Context, stdout, stderr io.Writer, cmd string, args ...string) (*guest.ExecResult, error) {
 				return nil, fmt.Errorf("SSH connection failed")
 			},
 		}

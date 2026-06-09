@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"strings"
 	"time"
 
@@ -80,27 +81,23 @@ func (g *Guest) WaitReady(ctx context.Context, timeout time.Duration) error {
 }
 
 // Exec runs a command on the Linux guest via SSH.
-func (g *Guest) Exec(ctx context.Context, cmd string, args ...string) (*guest.ExecResult, error) {
+func (g *Guest) Exec(ctx context.Context, stdout, stderr io.Writer, cmd string, args ...string) (*guest.ExecResult, error) {
 	fullCmd := cmd
 	if len(args) > 0 {
 		fullCmd = cmd + " " + strings.Join(args, " ")
 	}
 
-	stdout, stderr, exitCode, err := g.command.RunCommand(ctx, fullCmd)
+	exitCode, err := g.command.RunCommand(ctx, stdout, stderr, fullCmd)
 	if err != nil {
 		return nil, err
 	}
 
-	return &guest.ExecResult{
-		ExitCode: exitCode,
-		Stdout:   stdout,
-		Stderr:   stderr,
-	}, nil
+	return &guest.ExecResult{ExitCode: exitCode}, nil
 }
 
 // Shutdown gracefully shuts down the Linux guest.
 func (g *Guest) Shutdown(ctx context.Context) error {
-	_, _, _, err := g.command.RunCommand(ctx, "shutdown -h now")
+	_, err := g.command.RunCommand(ctx, io.Discard, io.Discard, "shutdown -h now")
 	if err != nil {
 		if g.command.IsConnected() {
 			return fmt.Errorf("shutdown command failed: %w", err)
@@ -112,7 +109,7 @@ func (g *Guest) Shutdown(ctx context.Context) error {
 
 // Reboot reboots the Linux guest.
 func (g *Guest) Reboot(ctx context.Context) error {
-	_, _, _, err := g.command.RunCommand(ctx, "reboot")
+	_, err := g.command.RunCommand(ctx, io.Discard, io.Discard, "reboot")
 	if err != nil {
 		if g.command.IsConnected() {
 			return fmt.Errorf("reboot command failed: %w", err)

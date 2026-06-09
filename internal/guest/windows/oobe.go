@@ -4,8 +4,10 @@
 package windows
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"strings"
 	"time"
 
@@ -44,13 +46,14 @@ func checkOOBEState(ctx context.Context, t transport.CommandTransport) (bool, er
 		return true, ctx.Err()
 	}
 
-	stdout, _, _, err := t.RunCommand(ctx, oobeStateQuery)
+	var stdoutBuf bytes.Buffer
+	_, err := t.RunCommand(ctx, &stdoutBuf, io.Discard, oobeStateQuery)
 	if err != nil {
 		// Command failure is expected during OOBE; keep polling.
 		return false, nil
 	}
 
-	complete, err := isOOBEComplete(stdout)
+	complete, err := isOOBEComplete(stdoutBuf.String())
 	if err != nil {
 		// Parsing failure is treated as "still in progress" to keep polling.
 		return false, nil

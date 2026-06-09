@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -104,25 +105,24 @@ func (t *WinRMTransport) IsConnected() bool {
 	return err == nil
 }
 
-func (t *WinRMTransport) RunCommand(ctx context.Context, cmd string) (stdout, stderr string, exitCode int, err error) {
+func (t *WinRMTransport) RunCommand(ctx context.Context, stdout, stderr io.Writer, cmd string) (exitCode int, err error) {
 	t.mu.Lock()
 	if t.client == nil {
 		t.mu.Unlock()
 		if connErr := t.Connect(ctx); connErr != nil {
-			return "", "", -1, fmt.Errorf("failed to connect: %w", connErr)
+			return -1, fmt.Errorf("failed to connect: %w", connErr)
 		}
 		t.mu.Lock()
 	}
 	client := t.client
 	t.mu.Unlock()
 
-	var stdoutBuf, stderrBuf bytes.Buffer
-	exitCode, err = client.RunWithContext(ctx, cmd, &stdoutBuf, &stderrBuf)
+	exitCode, err = client.RunWithContext(ctx, cmd, stdout, stderr)
 	if err != nil {
-		return stdoutBuf.String(), stderrBuf.String(), exitCode, fmt.Errorf("WinRM command failed: %w", err)
+		return exitCode, fmt.Errorf("WinRM command failed: %w", err)
 	}
 
-	return stdoutBuf.String(), stderrBuf.String(), exitCode, nil
+	return exitCode, nil
 }
 
 // Upload copies a local file to the guest via WinRM (PowerShell Base64 transfer).
