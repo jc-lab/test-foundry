@@ -161,6 +161,10 @@ func (r *Runner) RunSteps(ctx context.Context, steps []config.Step, panicCh <-ch
 
 			panicDetected = true
 			stepErr = fmt.Errorf("panic detected")
+		case <-ctx.Done():
+			// Parent context cancelled (e.g. QEMU exited unexpectedly).
+			// stepCtx is already cancelled; abandon the action goroutine.
+			stepErr = ctx.Err()
 		}
 
 		duration := time.Since(startTime)
