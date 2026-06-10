@@ -31,6 +31,7 @@ type Machine struct {
 	exitErr        error // stores the process exit error (non-nil means abnormal)
 	nextListenerID int
 	listeners      map[int]chan QMPEvent
+	childGuard     func() // closes platform-specific resources (e.g. Windows Job Object)
 }
 
 // qmpRawMessage is used internally to classify incoming QMP JSON messages.
@@ -72,17 +73,25 @@ func StartMachine(ctx context.Context, config *MachineConfig) (*Machine, error) 
 	cmd := exec.CommandContext(ctx, config.QemuPath, args...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
+	setupChildProcess(cmd)
 
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("failed to start QEMU: %w", err)
 	}
 
+	guard, err := attachToJobObject(cmd.Process.Pid)
+	if err != nil {
+		logging.Warn("Failed to attach QEMU to job object, child may outlive parent", "error", err)
+		guard = func() {}
+	}
+
 	m := &Machine{
-		Config:    config,
-		process:   cmd,
-		respCh:    make(chan qmpRawMessage, 16),
-		done:      make(chan struct{}),
-		listeners: make(map[int]chan QMPEvent),
+		Config:     config,
+		process:    cmd,
+		respCh:     make(chan qmpRawMessage, 16),
+		done:       make(chan struct{}),
+		listeners:  make(map[int]chan QMPEvent),
+		childGuard: guard,
 	}
 
 	// Wait for QMP socket to become available
@@ -311,13 +320,18 @@ func (m *Machine) IsRunning() bool {
 
 // Kill forcefully terminates the QEMU process.
 func (m *Machine) Kill() error {
+	var err error
 	if m.qmpConn != nil {
 		m.qmpConn.Close()
 	}
 	if m.process != nil && m.process.Process != nil {
-		return m.process.Process.Kill()
+		err = m.process.Process.Kill()
 	}
-	return nil
+	if m.childGuard != nil {
+		m.childGuard()
+		m.childGuard = nil
+	}
+	return err
 }
 
 func (m *Machine) dispatchEvent(event QMPEvent) {
