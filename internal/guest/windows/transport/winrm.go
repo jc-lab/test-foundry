@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -16,6 +17,7 @@ import (
 	"time"
 
 	"github.com/NextronSystems/universalpath"
+	"github.com/jc-lab/test-foundry/internal/logging"
 	"github.com/masterzen/winrm"
 )
 
@@ -26,6 +28,9 @@ type WinRMTransport struct {
 	client    *winrm.Client
 	mu        sync.Mutex
 }
+
+// winrmProbeTimeout bounds the IsConnected probe.
+const winrmProbeTimeout = 5 * time.Second
 
 var _ CommandTransport = (*WinRMTransport)(nil)
 var _ FileTransport = (*WinRMTransport)(nil)
@@ -43,6 +48,17 @@ func (t *WinRMTransport) Name() string { return "winrm" }
 func (t *WinRMTransport) Connect(ctx context.Context) error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
+
+	return t.connectLocked(ctx)
+}
+
+// connectLocked establishes the WinRM client. The caller must hold t.mu.
+// It is a no-op when a client already exists so that concurrent callers cannot
+// race into creating a second one.
+func (t *WinRMTransport) connectLocked(ctx context.Context) error {
+	if t.client != nil {
+		return nil
+	}
 
 	port := t.config.Port
 	if port == 0 {
@@ -80,6 +96,18 @@ func (t *WinRMTransport) Connect(ctx context.Context) error {
 	return nil
 }
 
+// acquireClient returns a connected client, connecting on first use. The whole
+// check-and-connect runs under t.mu so concurrent callers share one client.
+func (t *WinRMTransport) acquireClient(ctx context.Context) (*winrm.Client, error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	if err := t.connectLocked(ctx); err != nil {
+		return nil, fmt.Errorf("failed to connect: %w", err)
+	}
+	return t.client, nil
+}
+
 func (t *WinRMTransport) Close() error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -89,36 +117,37 @@ func (t *WinRMTransport) Close() error {
 }
 
 func (t *WinRMTransport) IsConnected() bool {
+	// The mutex is released before probing so a slow guest cannot block Close()
+	// or a concurrent command for the duration of the check.
 	t.mu.Lock()
-	defer t.mu.Unlock()
+	client := t.client
+	t.mu.Unlock()
 
-	if t.client == nil {
+	if client == nil {
 		return false
 	}
 
 	// Quick connectivity check
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), winrmProbeTimeout)
 	defer cancel()
 
 	var stdout, stderr bytes.Buffer
-	_, err := t.client.RunWithContext(ctx, "echo ok", &stdout, &stderr)
+	_, err := client.RunWithContext(ctx, "echo ok", &stdout, &stderr)
 	return err == nil
 }
 
 func (t *WinRMTransport) RunCommand(ctx context.Context, stdout, stderr io.Writer, cmd string) (exitCode int, err error) {
-	t.mu.Lock()
-	if t.client == nil {
-		t.mu.Unlock()
-		if connErr := t.Connect(ctx); connErr != nil {
-			return -1, fmt.Errorf("failed to connect: %w", connErr)
-		}
-		t.mu.Lock()
+	client, err := t.acquireClient(ctx)
+	if err != nil {
+		return -1, err
 	}
-	client := t.client
-	t.mu.Unlock()
 
 	exitCode, err = client.RunWithContext(ctx, cmd, stdout, stderr)
 	if err != nil {
+		if winrmErr, ok := errors.AsType[*winrm.ExecuteCommandError](err); ok {
+			logging.Debug("winrm error", "body", winrmErr.Body)
+		}
+
 		return exitCode, fmt.Errorf("WinRM command failed: %w", err)
 	}
 
@@ -133,16 +162,10 @@ func (t *WinRMTransport) Upload(ctx context.Context, localPath, remotePath strin
 		return fmt.Errorf("failed to read local file %s: %w", localPath, err)
 	}
 
-	t.mu.Lock()
-	if t.client == nil {
-		t.mu.Unlock()
-		if connErr := t.Connect(ctx); connErr != nil {
-			return fmt.Errorf("failed to connect: %w", connErr)
-		}
-		t.mu.Lock()
+	client, err := t.acquireClient(ctx)
+	if err != nil {
+		return err
 	}
-	client := t.client
-	t.mu.Unlock()
 
 	// Normalize to Windows path separators
 	remotePath = strings.ReplaceAll(remotePath, "/", "\\")
@@ -195,16 +218,10 @@ func (t *WinRMTransport) Upload(ctx context.Context, localPath, remotePath strin
 
 // Download copies a file from the guest to local via WinRM (PowerShell Base64 transfer).
 func (t *WinRMTransport) Download(ctx context.Context, remotePath, localPath string) error {
-	t.mu.Lock()
-	if t.client == nil {
-		t.mu.Unlock()
-		if connErr := t.Connect(ctx); connErr != nil {
-			return fmt.Errorf("failed to connect: %w", connErr)
-		}
-		t.mu.Lock()
+	client, err := t.acquireClient(ctx)
+	if err != nil {
+		return err
 	}
-	client := t.client
-	t.mu.Unlock()
 
 	remotePath = strings.ReplaceAll(remotePath, "/", "\\")
 
